@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Dummy Shopping - Product Details</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <nav class="breadcrumb">
+      <a href="index.html">Home</a> &gt;
+    </nav>
+  </header>
+
+  <!-- Same cart hover feature as in main page -->
+  <section class="shopping-cart">
+    <div class="cart-summary">
+      <!-- Collapsed view showing total price -->
+      <p>Total: $15.00</p>
+    </div>
+    <div class="cart-details">
+      <!-- Expanded view on hover, showing details of items -->
+      <h2>Shopping List</h2>
+      <ul>
+        <li>
+          <!-- Example dummy items -->
+          <span>Product 1</span>
+          <input type="number" min="1" value="1">
+          <span>$10.00</span>
+        </li>
+        <li>
+          <span>Product 2</span>
+          <input type="number" min="1" value="2">
+          <span>$5.00</span>
+        </li>
+      </ul>
+      <button type="submit">Checkout</button>
+    </div>
+  </section>
+
+  <main>
+    <aside>
+      <h2>Categories</h2>
+      <ul>
+        <li><a href="index.html?category=cat1">Category 1</a></li>
+        <li><a href="index.html?category=cat2">Category 2</a></li>
+        <li><a href="index.html?category=cat3">Category 3</a></li>
+      </ul>
+    </aside>
+
+    <section class="product-details">
+      <!-- Product details will be inserted here by JavaScript -->
+    </section>
+  </main>
+
+  <footer>
+    <p>1155175347</p>
+  </footer>
+
+  <script src="products.js"></script>
+
+</body>
+</html>

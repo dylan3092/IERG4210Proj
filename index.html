@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Dummy Shopping - Home</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <nav class="breadcrumb">
+      <!-- Hierarchical navigation: on the main page, only "Home" is shown -->
+      <a href="index.html">Home</a>
+    </nav>
+  </header>
+
+  <!-- Hover-based cart that appears in both main and product pages -->
+  <section class="shopping-cart">
+    <div class="cart-summary">
+      <!-- Collapsed view showing total price -->
+      <p>Total: $15.00</p>
+    </div>
+    <div class="cart-details">
+      <!-- Expanded view on hover, showing details of items -->
+      <h2>Shopping List</h2>
+      <ul>
+        <li>
+          <!-- Example dummy items -->
+          <span>Product 1</span>
+          <input type="number" min="1" value="1">
+          <span>$10.00</span>
+        </li>
+        <li>
+          <span>Product 2</span>
+          <input type="number" min="1" value="2">
+          <span>$5.00</span>
+        </li>
+      </ul>
+      <button type="submit">Checkout</button>
+    </div>
+  </section>
+
+  <main>
+    <!-- Left column: Categories list -->
+    <aside>
+      <h2>Categories</h2>
+      <ul>
+        <li><a href="?category=cat1">Category 1</a></li>
+        <li><a href="?category=cat2">Category 2</a></li>
+        <li><a href="?category=cat3">Category 3</a></li>
+      </ul>
+    </aside>
+
+    <!-- Right column: Responsive product list (using CSS tableless approach) -->
+    <section class="product-list">
+      <article class="product-item">
+        <a href="product.html?product=1">
+          <img src="images/water.jpg" alt="Product 1" width="150" height="150">
+          <h3>Product 1</h3>
+        </a>
+        <p class="price">$10.00</p>
+        <button>Add to Cart</button>
+      </article>
+
+      <article class="product-item">
+        <a href="product.html?product=2">
+          <img src="images/coke.jpg" alt="Product 2" width="150" height="150">
+          <h3>Product 2</h3>
+        </a>
+        <p class="price">$15.00</p>
+        <button>Add to Cart</button>
+      </article>
+
+      <article class="product-item">
+        <a href="product.html?product=3">
+          <img src="images/fan.jpg" alt="Product 3" width="150" height="150">
+          <h3>Product 3</h3>
+        </a>
+        <p class="price">$20.00</p>
+        <button>Add to Cart</button>
+      </article>
+
+      <article class="product-item">
+        <a href="product.html?product=4">
+          <img src="images/mouse.jpg" alt="Product 4" width="150" height="150">
+          <h3>Product 4</h3>
+        </a>
+        <p class="price">$25.00</p>
+        <button>Add to Cart</button>
+      </article>
+
+      <article class="product-item">
+        <a href="product.html?product=5">
+          <img src="images/computer.jpg" alt="Product 5" width="150" height="150">
+          <h3>Product 5</h3>
+        </a>
+        <p class="price">$30.00</p>
+        <button>Add to Cart</button>
+      </article>
+
+      <article class="product-item">
+        <a href="product.html?product=6">
+          <img src="images/linux.jpg" alt="Product 6" width="150" height="150">
+          <h3>Product 6</h3>
+        </a>
+        <p class="price">$35.00</p>
+        <button>Add to Cart</button>
+      </article>
+    </section>
+  </main>
+
+  <footer>
+    <p>1155175347</p>
+  </footer>
+
+  <script src="breadcrumb.js"></script>
+
+</body>
+</html>
