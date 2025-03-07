@@ -1,3 +1,9 @@
 An Amazon EC2 instance is created, allocated with an dynamic IP.
 The files in this codebase is uploaded to a github repository, https://github.com/dylan3092/IERG4210Proj, and they will be fetched to the amazon EC2 instance.
 MySQL is used as database and its stored in the amazon EC2 instance.
+
+TO start the admin panel, navigate to /var/www/html/IP/, and then nohup node server.js > output.log 2>&1 &
+admin panel is accessed from http://3.146.226.22:3000/admin.html
+
+To find the pid in case, ps aux | grep node
+

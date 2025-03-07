@@ -2,39 +2,27 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Dummy Shopping - Product Details</title>
+  <title>Product Details - Dummy Shopping</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <header>
     <nav class="breadcrumb">
-      <a href="index.html">Home</a> &gt;
+      <!-- Will be populated by JavaScript -->
     </nav>
   </header>
 
-  <!-- Same cart hover feature as in main page -->
+  <!-- Shopping cart section -->
   <section class="shopping-cart">
     <div class="cart-summary">
-      <!-- Collapsed view showing total price -->
-      <p>Total: $15.00</p>
+      <p>Total: <span id="cart-total">$0.00</span></p>
     </div>
     <div class="cart-details">
-      <!-- Expanded view on hover, showing details of items -->
       <h2>Shopping List</h2>
-      <ul>
-        <li>
-          <!-- Example dummy items -->
-          <span>Product 1</span>
-          <input type="number" min="1" value="1">
-          <span>$10.00</span>
-        </li>
-        <li>
-          <span>Product 2</span>
-          <input type="number" min="1" value="2">
-          <span>$5.00</span>
-        </li>
+      <ul id="cart-items">
+        <!-- Cart items will be dynamically added here -->
       </ul>
-      <button type="submit">Checkout</button>
+      <button type="submit" id="checkout-btn" disabled>Checkout</button>
     </div>
   </section>
 
@@ -42,14 +30,12 @@
     <aside>
       <h2>Categories</h2>
       <ul>
-        <li><a href="index.html?category=cat1">Category 1</a></li>
-        <li><a href="index.html?category=cat2">Category 2</a></li>
-        <li><a href="index.html?category=cat3">Category 3</a></li>
+        <!-- Categories will be populated by JavaScript -->
       </ul>
     </aside>
 
     <section class="product-details">
-      <!-- Product details will be inserted here by JavaScript -->
+      <!-- Product details will be populated by JavaScript -->
     </section>
   </main>
 
@@ -57,7 +43,10 @@
     <p>1155175347</p>
   </footer>
 
-  <script src="products.js"></script>
-
+  <script>
+    const BASE_URL = 'http://s15.ierg4210.ie.cuhk.edu.hk:3000';
+  </script>
+  <script src="product.js"></script>
+  <script src="cart.js"></script>
 </body>
 </html>
