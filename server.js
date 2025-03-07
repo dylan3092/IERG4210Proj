@@ -2,14 +2,18 @@ const express = require('express');
 const mysql = require('mysql2/promise');
 const multer = require('multer');
 const path = require('path');
-const fs = require('fs').promises;
+const fs = require('fs/promises');
 
 const app = express();
 
 // Add this near the top of server.js
 const uploadDir = './uploads';
-if (!fs.existsSync(uploadDir)){
-    fs.mkdirSync(uploadDir);
+try {
+    if (!require('fs').existsSync(uploadDir)) {
+        require('fs').mkdirSync(uploadDir);
+    }
+} catch (err) {
+    console.error('Error creating uploads directory:', err);
 }
 
 // Database connection
@@ -52,12 +56,23 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
 app.use('/uploads', express.static('uploads'));
 
+// Test database connection
+pool.getConnection()
+    .then(connection => {
+        console.log('Database connected successfully');
+        connection.release();
+    })
+    .catch(err => {
+        console.error('Error connecting to the database:', err);
+    });
+
 // Categories API
 app.get('/api/categories', async (req, res) => {
     try {
         const [rows] = await pool.query('SELECT * FROM categories');
         res.json(rows);
     } catch (error) {
+        console.error('Error fetching categories:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -227,8 +242,16 @@ app.delete('/api/products/:id', async (req, res) => {
     }
 });
 
+// Error handling middleware
+app.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(500).json({ error: err.message });
+});
+
 // Start server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
+}).on('error', (err) => {
+    console.error('Server failed to start:', err);
 }); 
