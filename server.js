@@ -77,16 +77,21 @@ app.get('/api/categories/:id', async (req, res) => {
 
 app.post('/api/categories', async (req, res) => {
     try {
-        // Add logging
-        console.log('Received category data:', req.body);
+        console.log('Received category data:', req.body); // Debug log
         
-        const { name } = req.body;
-        if (!name) {
-            return res.status(400).json({ error: 'Name is required' });
+        if (!req.body.name || req.body.name.trim() === '') {
+            return res.status(400).json({ error: 'Category name is required' });
         }
+
+        const [result] = await pool.query(
+            'INSERT INTO categories (name) VALUES (?)', 
+            [req.body.name.trim()]
+        );
         
-        const [result] = await pool.query('INSERT INTO categories (name) VALUES (?)', [name]);
-        res.json({ id: result.insertId, name });
+        res.json({ 
+            catid: result.insertId, 
+            name: req.body.name.trim() 
+        });
     } catch (error) {
         console.error('Error creating category:', error);
         res.status(500).json({ error: error.message });
@@ -141,16 +146,24 @@ app.get('/api/products/:id', async (req, res) => {
 
 app.post('/api/products', upload.single('image'), async (req, res) => {
     try {
+        console.log('Received product data:', req.body); // Debug log
+        console.log('Received file:', req.file); // Debug log
+
         const { catid, name, price, description } = req.body;
         const image = req.file ? req.file.filename : null;
 
+        // Validate required fields
+        if (!catid || !name || !price) {
+            return res.status(400).json({ error: 'Category, name, and price are required' });
+        }
+
         const [result] = await pool.query(
             'INSERT INTO products (catid, name, price, description, image) VALUES (?, ?, ?, ?, ?)',
-            [catid, name, price, description, image]
+            [catid, name, price, description || null, image]
         );
 
         res.json({
-            id: result.insertId,
+            pid: result.insertId,
             catid,
             name,
             price,
@@ -158,6 +171,7 @@ app.post('/api/products', upload.single('image'), async (req, res) => {
             image
         });
     } catch (error) {
+        console.error('Error creating product:', error);
         res.status(500).json({ error: error.message });
     }
 });

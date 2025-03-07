@@ -49,9 +49,6 @@ const loadCategories = async () => {
 const handleCategorySubmit = async (event) => {
     event.preventDefault();
     const formData = new FormData(event.target);
-    const categoryData = {
-        name: formData.get('name')
-    };
     
     try {
         const catid = formData.get('catid');
@@ -60,12 +57,14 @@ const handleCategorySubmit = async (event) => {
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify(categoryData)
+            body: JSON.stringify({
+                name: formData.get('name')
+            })
         });
 
         if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Failed to save category');
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to save category');
         }
 
         const result = await response.json();
@@ -124,16 +123,23 @@ const loadProducts = async () => {
 const handleProductSubmit = async (event) => {
     event.preventDefault();
     const formData = new FormData(event.target);
-    const pid = formData.get('pid');
     
     try {
+        const pid = formData.get('pid');
         const response = await fetch(API.products + (pid ? `/${pid}` : ''), {
             method: pid ? 'PUT' : 'POST',
-            body: formData
-        }).then(handleResponse);
+            body: formData // Send FormData directly for file upload
+        });
 
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to save product');
+        }
+
+        const result = await response.json();
         showMessage(`Product ${pid ? 'updated' : 'created'} successfully`);
         event.target.reset();
+        document.getElementById('image-preview').innerHTML = '';
         loadProducts();
     } catch (error) {
         showMessage(error.message, true);
