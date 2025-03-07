@@ -59,6 +59,14 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
 app.use('/uploads', express.static('uploads'));
 
+// Add this near the top, after creating the app
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');  // Or specific domain
+    res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE');
+    res.header('Access-Control-Allow-Headers', 'Content-Type');
+    next();
+});
+
 // Test database connection on server start
 pool.getConnection()
     .then(connection => {
