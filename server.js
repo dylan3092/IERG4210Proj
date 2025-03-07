@@ -6,6 +6,12 @@ const fs = require('fs').promises;
 
 const app = express();
 
+// Add this near the top of server.js
+const uploadDir = './uploads';
+if (!fs.existsSync(uploadDir)){
+    fs.mkdirSync(uploadDir);
+}
+
 // Database connection
 const pool = mysql.createPool({
     host: 'localhost',
@@ -42,6 +48,7 @@ const upload = multer({
 
 // Middleware
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
 app.use('/uploads', express.static('uploads'));
 
@@ -55,12 +62,33 @@ app.get('/api/categories', async (req, res) => {
     }
 });
 
+app.get('/api/categories/:id', async (req, res) => {
+    try {
+        const [rows] = await pool.query('SELECT * FROM categories WHERE catid = ?', [req.params.id]);
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Category not found' });
+        }
+        res.json(rows[0]);
+    } catch (error) {
+        console.error('Error fetching category:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 app.post('/api/categories', async (req, res) => {
     try {
+        // Add logging
+        console.log('Received category data:', req.body);
+        
         const { name } = req.body;
+        if (!name) {
+            return res.status(400).json({ error: 'Name is required' });
+        }
+        
         const [result] = await pool.query('INSERT INTO categories (name) VALUES (?)', [name]);
         res.json({ id: result.insertId, name });
     } catch (error) {
+        console.error('Error creating category:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -94,6 +122,19 @@ app.get('/api/products', async (req, res) => {
         `);
         res.json(rows);
     } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/api/products/:id', async (req, res) => {
+    try {
+        const [rows] = await pool.query('SELECT * FROM products WHERE pid = ?', [req.params.id]);
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Product not found' });
+        }
+        res.json(rows[0]);
+    } catch (error) {
+        console.error('Error fetching product:', error);
         res.status(500).json({ error: error.message });
     }
 });

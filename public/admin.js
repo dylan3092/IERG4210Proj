@@ -49,14 +49,26 @@ const loadCategories = async () => {
 const handleCategorySubmit = async (event) => {
     event.preventDefault();
     const formData = new FormData(event.target);
-    const catid = formData.get('catid');
+    const categoryData = {
+        name: formData.get('name')
+    };
     
     try {
+        const catid = formData.get('catid');
         const response = await fetch(API.categories + (catid ? `/${catid}` : ''), {
             method: catid ? 'PUT' : 'POST',
-            body: formData
-        }).then(handleResponse);
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(categoryData)
+        });
 
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to save category');
+        }
+
+        const result = await response.json();
         showMessage(`Category ${catid ? 'updated' : 'created'} successfully`);
         event.target.reset();
         loadCategories();
