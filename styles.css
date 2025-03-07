@@ -139,3 +139,40 @@ footer {
   padding: 10px;
   text-align: center;
 }
+
+/* Add these styles to your existing CSS */
+aside ul li a {
+    text-decoration: none;
+    color: #333;
+    padding: 5px 10px;
+    display: block;
+    transition: background-color 0.3s;
+}
+
+aside ul li a:hover {
+    background-color: #f0f0f0;
+}
+
+aside ul li a.active {
+    background-color: #007bff;
+    color: white;
+}
+
+.breadcrumb {
+    padding: 10px;
+    margin-bottom: 20px;
+}
+
+.breadcrumb a {
+    color: #007bff;
+    text-decoration: none;
+}
+
+.breadcrumb .separator {
+    margin: 0 5px;
+    color: #666;
+}
+
+.product-list {
+    min-height: 200px;
+}

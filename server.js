@@ -149,12 +149,23 @@ app.delete('/api/categories/:id', async (req, res) => {
 app.get('/api/products', async (req, res) => {
     try {
         console.log('Fetching products from database...');
-        const query = `
+        let query = `
             SELECT p.*, c.name as category_name 
             FROM products p 
             JOIN categories c ON p.catid = c.catid
         `;
-        const [rows] = await pool.query(query);
+        
+        const categoryId = req.query.category;
+        let queryParams = [];
+        
+        if (categoryId) {
+            query += ' WHERE p.catid = ?';
+            queryParams.push(categoryId);
+        }
+        
+        query += ' ORDER BY p.name';  // Optional: sort products by name
+        
+        const [rows] = await pool.query(query, queryParams);
         
         // Convert decimal strings to numbers
         const products = rows.map(product => ({
@@ -162,7 +173,7 @@ app.get('/api/products', async (req, res) => {
             price: Number(product.price)
         }));
         
-        console.log('Sample product data:', products[0]);
+        console.log(`Found ${products.length} products${categoryId ? ' in category ' + categoryId : ''}`);
         res.json(products);
     } catch (error) {
         console.error('Error fetching products:', error);

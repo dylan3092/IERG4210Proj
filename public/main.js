@@ -1,35 +1,56 @@
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log('DOM Content Loaded');
+    // Get current category from URL if exists
+    const urlParams = new URLSearchParams(window.location.search);
+    const currentCategory = urlParams.get('category');
     
     // Fetch categories
     try {
         console.log('Fetching categories...');
         const response = await fetch('http://s15.ierg4210.ie.cuhk.edu.hk:3000/api/categories');
-        console.log('Categories response:', response);
         const categories = await response.json();
-        console.log('Categories data:', categories);
         
         const categoriesList = document.querySelector('aside ul');
         categoriesList.innerHTML = categories.map(category => `
-            <li><a href="?category=${category.catid}">${category.name}</a></li>
+            <li>
+                <a href="?category=${category.catid}" 
+                   class="${currentCategory == category.catid ? 'active' : ''}">
+                    ${category.name}
+                </a>
+            </li>
         `).join('');
+        
+        // Add "All Products" option
+        categoriesList.insertAdjacentHTML('afterbegin', `
+            <li>
+                <a href="/" class="${!currentCategory ? 'active' : ''}">
+                    All Products
+                </a>
+            </li>
+        `);
     } catch (error) {
         console.error('Error fetching categories:', error);
     }
 
-    // Fetch products
+    // Fetch products based on category
     try {
         console.log('Fetching products...');
-        const response = await fetch('http://s15.ierg4210.ie.cuhk.edu.hk:3000/api/products');
-        console.log('Products response:', response);
+        const productsUrl = currentCategory 
+            ? `http://s15.ierg4210.ie.cuhk.edu.hk:3000/api/products?category=${currentCategory}`
+            : 'http://s15.ierg4210.ie.cuhk.edu.hk:3000/api/products';
+            
+        const response = await fetch(productsUrl);
         const products = await response.json();
-        console.log('Products data:', products);
         
         const productList = document.querySelector('.product-list');
+        
+        if (products.length === 0) {
+            productList.innerHTML = '<p>No products found in this category.</p>';
+            return;
+        }
+        
         productList.innerHTML = products.map(product => {
-            // Convert price to number and handle potential errors
-            const price = parseFloat(product.price);
-            const formattedPrice = !isNaN(price) ? price.toFixed(2) : '0.00';
+            const price = typeof product.price === 'number' ? 
+                product.price : Number(product.price);
             
             return `
                 <article class="product-item">
@@ -40,13 +61,32 @@ document.addEventListener('DOMContentLoaded', async () => {
                             alt="${product.name}" width="150" height="150">
                         <h3>${product.name}</h3>
                     </a>
-                    <p class="price">$${formattedPrice}</p>
+                    <p class="price">$${price.toFixed(2)}</p>
                     <button>Add to Cart</button>
                 </article>
             `;
         }).join('');
 
+        // Update page title and breadcrumb based on category
+        if (currentCategory) {
+            const selectedCategory = categories.find(c => c.catid == currentCategory);
+            if (selectedCategory) {
+                document.title = `${selectedCategory.name} - Dummy Shopping`;
+                updateBreadcrumb(selectedCategory.name);
+            }
+        }
+
     } catch (error) {
         console.error('Error fetching products:', error);
+        console.error('Error details:', error.stack);
     }
 });
+
+// Function to update breadcrumb
+function updateBreadcrumb(categoryName) {
+    const breadcrumb = document.querySelector('.breadcrumb');
+    breadcrumb.innerHTML = `
+        <a href="/">Home</a>
+        ${categoryName ? `<span class="separator"> > </span><span>${categoryName}</span>` : ''}
+    `;
+}
