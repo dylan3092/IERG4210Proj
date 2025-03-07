@@ -20,8 +20,11 @@ try {
 const pool = mysql.createPool({
     host: 'localhost',
     user: 'root',
-    password: 'P@ssWord1',
-    database: 'shopping_db'
+    password: 'P@ssWord1', // Make sure this matches your MySQL password
+    database: 'shopping_db',
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0
 });
 
 // Multer configuration for file uploads
@@ -56,20 +59,22 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
 app.use('/uploads', express.static('uploads'));
 
-// Test database connection
+// Test database connection on server start
 pool.getConnection()
     .then(connection => {
-        console.log('Database connected successfully');
+        console.log('Successfully connected to MySQL database');
         connection.release();
     })
     .catch(err => {
-        console.error('Error connecting to the database:', err);
+        console.error('Error connecting to MySQL database:', err);
     });
 
 // Categories API
 app.get('/api/categories', async (req, res) => {
     try {
+        console.log('Fetching categories from database...');
         const [rows] = await pool.query('SELECT * FROM categories');
+        console.log('Categories fetched:', rows);
         res.json(rows);
     } catch (error) {
         console.error('Error fetching categories:', error);
@@ -135,22 +140,15 @@ app.delete('/api/categories/:id', async (req, res) => {
 // Products API
 app.get('/api/products', async (req, res) => {
     try {
-        let query = `
+        console.log('Fetching products from database...');
+        const query = `
             SELECT p.*, c.name as category_name 
             FROM products p 
             JOIN categories c ON p.catid = c.catid
         `;
-        
-        // Add category filter if provided
-        const categoryId = req.query.category;
-        if (categoryId) {
-            query += ' WHERE p.catid = ?';
-            const [rows] = await pool.query(query, [categoryId]);
-            res.json(rows);
-        } else {
-            const [rows] = await pool.query(query);
-            res.json(rows);
-        }
+        const [rows] = await pool.query(query);
+        console.log('Products fetched:', rows);
+        res.json(rows);
     } catch (error) {
         console.error('Error fetching products:', error);
         res.status(500).json({ error: error.message });
