@@ -155,8 +155,15 @@ app.get('/api/products', async (req, res) => {
             JOIN categories c ON p.catid = c.catid
         `;
         const [rows] = await pool.query(query);
-        console.log('Products fetched:', rows);
-        res.json(rows);
+        
+        // Convert decimal strings to numbers
+        const products = rows.map(product => ({
+            ...product,
+            price: Number(product.price)
+        }));
+        
+        console.log('Sample product data:', products[0]);
+        res.json(products);
     } catch (error) {
         console.error('Error fetching products:', error);
         res.status(500).json({ error: error.message });
