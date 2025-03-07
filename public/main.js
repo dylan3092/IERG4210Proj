@@ -1,10 +1,12 @@
 document.addEventListener('DOMContentLoaded', async () => {
+    const BASE_URL = window.location.protocol + '//' + window.location.hostname + ':3000';
+    
     console.log('DOM Content Loaded');
     
     // Fetch categories from API
     try {
         console.log('Fetching categories...');
-        const response = await fetch('/api/categories');
+        const response = await fetch(`${BASE_URL}/api/categories`);
         console.log('Categories response:', response);
         const categories = await response.json();
         console.log('Categories data:', categories);
@@ -27,7 +29,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Fetch products
     try {
         console.log('Fetching products...');
-        const response = await fetch('/api/products');
+        const response = await fetch(`${BASE_URL}/api/products`);
         console.log('Products response:', response);
         const products = await response.json();
         console.log('Products data:', products);
