@@ -10,7 +10,7 @@ const app = express();
 const pool = mysql.createPool({
     host: 'localhost',
     user: 'root',
-    password: 'your_password',
+    password: 'P@ssWord1',
     database: 'shopping_db'
 });
 
