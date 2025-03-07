@@ -17,25 +17,15 @@
   <section class="shopping-cart">
     <div class="cart-summary">
       <!-- Collapsed view showing total price -->
-      <p>Total: $15.00</p>
+      <p>Total: <span id="cart-total">$0.00</span></p>
     </div>
     <div class="cart-details">
       <!-- Expanded view on hover, showing details of items -->
       <h2>Shopping List</h2>
-      <ul>
-        <li>
-          <!-- Example dummy items -->
-          <span>Product 1</span>
-          <input type="number" min="1" value="1">
-          <span>$10.00</span>
-        </li>
-        <li>
-          <span>Product 2</span>
-          <input type="number" min="1" value="2">
-          <span>$5.00</span>
-        </li>
+      <ul id="cart-items">
+        <!-- Cart items will be dynamically added here -->
       </ul>
-      <button type="submit">Checkout</button>
+      <button type="submit" id="checkout-btn" disabled>Checkout</button>
     </div>
   </section>
 
@@ -105,6 +95,15 @@
         <p class="price">$35.00</p>
         <button>Add to Cart</button>
       </article>
+
+      <article class="product-item">
+        <a href="product.html?product=7">
+          <img src="images/keyboard.jpg" alt="Product 7" width="150" height="150">
+          <h3>Product 7</h3>
+        </a>
+        <p class="price">$40.00</p>
+        <button>Add to Cart</button>
+      </article>
     </section>
   </main>
 
@@ -113,6 +112,7 @@
   </footer>
 
   <script src="breadcrumb.js"></script>
+  <script src="cart.js"></script>
 
 </body>
 </html>
