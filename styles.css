@@ -128,3 +128,14 @@ footer {
 .shopping-cart:hover .cart-details {
   display: block;
 }
+
+.loading {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.error-message {
+  color: red;
+  padding: 10px;
+  text-align: center;
+}

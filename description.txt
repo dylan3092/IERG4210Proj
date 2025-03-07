@@ -1,0 +1,3 @@
+An Amazon EC2 instance is created, allocated with an dynamic IP.
+The files in this codebase is uploaded to a github repository, https://github.com/dylan3092/IERG4210Proj, and they will be fetched to the amazon EC2 instance.
+MySQL is used as database and its stored in the amazon EC2 instance.

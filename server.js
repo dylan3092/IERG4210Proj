@@ -135,13 +135,24 @@ app.delete('/api/categories/:id', async (req, res) => {
 // Products API
 app.get('/api/products', async (req, res) => {
     try {
-        const [rows] = await pool.query(`
+        let query = `
             SELECT p.*, c.name as category_name 
             FROM products p 
             JOIN categories c ON p.catid = c.catid
-        `);
-        res.json(rows);
+        `;
+        
+        // Add category filter if provided
+        const categoryId = req.query.category;
+        if (categoryId) {
+            query += ' WHERE p.catid = ?';
+            const [rows] = await pool.query(query, [categoryId]);
+            res.json(rows);
+        } else {
+            const [rows] = await pool.query(query);
+            res.json(rows);
+        }
     } catch (error) {
+        console.error('Error fetching products:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -238,6 +249,20 @@ app.delete('/api/products/:id', async (req, res) => {
         await pool.query('DELETE FROM products WHERE pid = ?', [req.params.id]);
         res.json({ message: 'Product deleted successfully' });
     } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get products by category
+app.get('/api/categories/:catid/products', async (req, res) => {
+    try {
+        const [rows] = await pool.query(
+            'SELECT * FROM products WHERE catid = ?', 
+            [req.params.catid]
+        );
+        res.json(rows);
+    } catch (error) {
+        console.error('Error fetching category products:', error);
         res.status(500).json({ error: error.message });
     }
 });
