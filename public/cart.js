@@ -5,23 +5,35 @@ let cart = {
 
 // Initialize cart functionality
 document.addEventListener('DOMContentLoaded', async () => {
-    // Load cart data from localStorage
+    // Load cart data immediately before showing UI
     await loadCart();
+    
+    // Initialize cart UI only after data is loaded
+    initializeCartUI();
+    await updateCartDisplay();
+});
 
-    // Add hover functionality to cart
+function initializeCartUI() {
     const cartSection = document.querySelector('.shopping-cart');
     const cartDetails = document.querySelector('.cart-details');
 
     if (cartSection && cartDetails) {
+        // Use CSS transitions for smooth show/hide
+        cartDetails.style.transition = 'opacity 0.3s';
+        
         cartSection.addEventListener('mouseenter', () => {
+            cartDetails.style.opacity = '1';
             cartDetails.style.display = 'block';
         });
 
         cartSection.addEventListener('mouseleave', () => {
-            cartDetails.style.display = 'none';
+            cartDetails.style.opacity = '0';
+            setTimeout(() => {
+                cartDetails.style.display = 'none';
+            }, 300);
         });
     }
-});
+}
 
 // Add to cart function
 async function addToCart(productId, quantity = 1) {
@@ -163,4 +175,4 @@ function showAddedFeedback() {
     setTimeout(() => {
         feedback.remove();
     }, 2000);
-} 
+}
