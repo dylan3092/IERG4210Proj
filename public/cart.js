@@ -30,19 +30,25 @@ async function addToCart(productId, quantity = 1) {
         quantity = parseInt(quantity);
         if (isNaN(quantity) || quantity < 1) quantity = 1;
 
-        // First, update the quantity in localStorage
-        if (!cart.items[productId]) {
+        // Fetch product details first to verify it exists
+        const productDetails = await updateProductDetails(productId);
+        if (!productDetails) {
+            throw new Error('Product not found');
+        }
+
+        // Update cart
+        if (cart.items[productId]) {
+            cart.items[productId].quantity += quantity;
+        } else {
             cart.items[productId] = {
-                quantity: 0,
+                quantity: quantity,
+                name: productDetails.name,
+                price: Number(productDetails.price)
             };
         }
-        cart.items[productId].quantity += quantity;
 
-        // Save to localStorage immediately
+        // Save to localStorage
         saveCart();
-
-        // Then fetch latest product details via AJAX
-        await updateProductDetails(productId);
         
         // Update display
         await updateCartDisplay();
@@ -60,22 +66,17 @@ async function updateProductDetails(productId) {
     console.log('Fetching product details for:', productId);
     try {
         const response = await fetch(`${BASE_URL}/api/products/${productId}`);
-        if (!response.ok) throw new Error('Product not found');
+        if (!response.ok) {
+            throw new Error('Product not found');
+        }
         
         const product = await response.json();
         console.log('Received product details:', product);
+        return product;
         
-        // Update cart item with latest product details
-        cart.items[productId] = {
-            ...cart.items[productId],
-            name: product.name,
-            price: Number(product.price)
-        };
-        
-        // Save updated details to localStorage
-        saveCart();
     } catch (error) {
         console.error('Error fetching product details:', error);
+        return null;
     }
 }
 
@@ -87,14 +88,9 @@ async function updateCartDisplay() {
     
     if (!cartList || !cartTotal || !checkoutBtn) return;
 
-    // Ensure all product details are up to date
-    await Promise.all(
-        Object.keys(cart.items).map(pid => updateProductDetails(pid))
-    );
-
     // Calculate total
-    const total = Object.values(cart.items).reduce(
-        (sum, item) => sum + (item.price * item.quantity), 
+    const total = Object.entries(cart.items).reduce(
+        (sum, [_, item]) => sum + (Number(item.price) * item.quantity), 
         0
     );
 
@@ -107,7 +103,7 @@ async function updateCartDisplay() {
                 <span class="item-quantity">${item.quantity}</span>
                 <button onclick="updateQuantity(${pid}, ${item.quantity + 1})">+</button>
             </div>
-            <span class="item-price">$${(item.price * item.quantity).toFixed(2)}</span>
+            <span class="item-price">$${(Number(item.price) * item.quantity).toFixed(2)}</span>
             <button class="remove-item" onclick="removeFromCart(${pid})">×</button>
         </li>
     `).join('');
@@ -142,13 +138,18 @@ function saveCart() {
     localStorage.setItem('shopping_cart', JSON.stringify(cart));
 }
 
-// Load cart from localStorage and fetch product details
+// Load cart from localStorage
 async function loadCart() {
-    const savedCart = localStorage.getItem('shopping_cart');
-    if (savedCart) {
-        cart = JSON.parse(savedCart);
-        // Fetch latest product details for all items
-        await updateCartDisplay();
+    try {
+        const savedCart = localStorage.getItem('shopping_cart');
+        if (savedCart) {
+            cart = JSON.parse(savedCart);
+            await updateCartDisplay();
+        }
+    } catch (error) {
+        console.error('Error loading cart:', error);
+        cart = { items: {} };
+        saveCart();
     }
 }
 

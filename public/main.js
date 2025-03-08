@@ -62,7 +62,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         <h3>${product.name}</h3>
                     </a>
                     <p class="price">$${price.toFixed(2)}</p>
-                    <button onclick="addToCart(${product.pid}, 1)">Add to Cart</button>
+                    <button type="button" onclick="addToCart(${product.pid}, 1)">Add to Cart</button>
                 </article>
             `;
         }).join('');
