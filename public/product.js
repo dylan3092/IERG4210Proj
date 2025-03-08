@@ -29,7 +29,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Update page title
         document.title = `${product.name} - Dummy Shopping`;
 
-        // Update breadcrumb
+        // Update breadcrumb using category_name from API
         const breadcrumb = document.querySelector('.breadcrumb');
         breadcrumb.innerHTML = `
             <a href="/">Home</a>
