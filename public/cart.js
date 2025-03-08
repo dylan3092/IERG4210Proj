@@ -1,6 +1,8 @@
-// Cart data structure
+// Cart data structure with state management
 let cart = {
-    items: {} // Using object with pid as key for easier lookup
+    items: {},
+    isLoading: false,
+    imageCache: new Map()
 };
 
 // Initialize cart functionality
@@ -11,7 +13,28 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Initialize cart UI only after data is loaded
     initializeCartUI();
     await updateCartDisplay();
+
+    // Preload images for items in cart
+    Object.keys(cart.items).forEach(pid => {
+        preloadProductImage(pid);
+    });
 });
+
+// Preload product images
+async function preloadProductImage(productId) {
+    if (!cart.imageCache.has(productId)) {
+        try {
+            const product = await updateProductDetails(productId);
+            if (product && product.image) {
+                const img = new Image();
+                img.src = `${BASE_URL}/uploads/${product.image}`;
+                cart.imageCache.set(productId, img);
+            }
+        } catch (error) {
+            console.error('Error preloading image:', error);
+        }
+    }
+}
 
 function initializeCartUI() {
     const cartSection = document.querySelector('.shopping-cart');
@@ -37,7 +60,9 @@ function initializeCartUI() {
 
 // Add to cart function
 async function addToCart(productId, quantity = 1) {
-    console.log('Adding to cart:', productId, quantity);
+    if (cart.isLoading) return;
+    cart.isLoading = true;
+    
     try {
         quantity = parseInt(quantity);
         if (isNaN(quantity) || quantity < 1) quantity = 1;
@@ -48,28 +73,38 @@ async function addToCart(productId, quantity = 1) {
             throw new Error('Product not found');
         }
 
-        // Update cart
+        // Preload image
+        await preloadProductImage(productId);
+
+        // Optimistic UI update
+        const previousState = { ...cart.items };
         if (cart.items[productId]) {
             cart.items[productId].quantity += quantity;
         } else {
             cart.items[productId] = {
                 quantity: quantity,
                 name: productDetails.name,
-                price: Number(productDetails.price)
+                price: Number(productDetails.price),
+                image: productDetails.image
             };
         }
 
+        // Update display immediately
+        await updateCartDisplay();
+        
         // Save to localStorage
         saveCart();
-        
-        // Update display
-        await updateCartDisplay();
         
         // Show feedback
         showAddedFeedback();
         
     } catch (error) {
         console.error('Error adding to cart:', error);
+        // Rollback on error
+        cart.items = previousState;
+        await updateCartDisplay();
+    } finally {
+        cart.isLoading = false;
     }
 }
 
@@ -92,7 +127,7 @@ async function updateProductDetails(productId) {
     }
 }
 
-// Update cart display
+// Update cart display with smooth transitions
 async function updateCartDisplay() {
     const cartList = document.getElementById('cart-items');
     const cartTotal = document.getElementById('cart-total');
@@ -106,22 +141,60 @@ async function updateCartDisplay() {
         0
     );
 
-    // Update display
-    cartList.innerHTML = Object.entries(cart.items).map(([pid, item]) => `
-        <li>
+    // Prepare new content with cached images
+    const newContent = Object.entries(cart.items).map(([pid, item]) => `
+        <li class="cart-item" data-pid="${pid}">
+            <div class="item-image">
+                ${cart.imageCache.has(pid) ? 
+                    `<img src="${cart.imageCache.get(pid).src}" alt="${item.name}" width="50">` : 
+                    ''}
+            </div>
             <span class="item-name">${item.name}</span>
             <div class="item-controls">
-                <button onclick="updateQuantity(${pid}, ${item.quantity - 1})">-</button>
+                <button class="quantity-btn" onclick="updateQuantity(${pid}, ${item.quantity - 1})">-</button>
                 <span class="item-quantity">${item.quantity}</span>
-                <button onclick="updateQuantity(${pid}, ${item.quantity + 1})">+</button>
+                <button class="quantity-btn" onclick="updateQuantity(${pid}, ${item.quantity + 1})">+</button>
             </div>
             <span class="item-price">$${(Number(item.price) * item.quantity).toFixed(2)}</span>
             <button class="remove-item" onclick="removeFromCart(${pid})">×</button>
         </li>
     `).join('');
 
-    cartTotal.textContent = `$${total.toFixed(2)}`;
+    // Smooth transition for total
+    const currentTotal = parseFloat(cartTotal.textContent.replace('$', ''));
+    if (currentTotal !== total) {
+        animateValue(cartTotal, currentTotal, total, 300);
+    }
+
+    // Update cart items with transition
+    if (cartList.innerHTML !== newContent) {
+        cartList.style.opacity = '0';
+        setTimeout(() => {
+            cartList.innerHTML = newContent;
+            cartList.style.opacity = '1';
+        }, 150);
+    }
+
     checkoutBtn.disabled = total === 0;
+}
+
+// Animate number changes
+function animateValue(element, start, end, duration) {
+    const startTime = performance.now();
+    
+    function update(currentTime) {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+
+        const current = start + (end - start) * progress;
+        element.textContent = `$${current.toFixed(2)}`;
+
+        if (progress < 1) {
+            requestAnimationFrame(update);
+        }
+    }
+
+    requestAnimationFrame(update);
 }
 
 // Update item quantity
@@ -160,7 +233,7 @@ async function loadCart() {
         }
     } catch (error) {
         console.error('Error loading cart:', error);
-        cart = { items: {} };
+        cart = { items: {}, isLoading: false, imageCache: new Map() };
         saveCart();
     }
 }
