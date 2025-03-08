@@ -3,6 +3,7 @@ const mysql = require('mysql2/promise');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs/promises');
+const sharp = require('sharp');
 
 const app = express();
 
@@ -27,12 +28,21 @@ const pool = mysql.createPool({
     queueLimit: 0
 });
 
+// Define image sizes
+const IMAGE_SIZES = {
+    thumbnail: { width: 150, height: 150 },
+    full: { width: 800, height: 800 }
+};
+
 // Multer configuration for file uploads
 const storage = multer.diskStorage({
     destination: './uploads/',
     filename: (req, file, cb) => {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, uniqueSuffix + path.extname(file.originalname));
+        const ext = path.extname(file.originalname);
+        // Store original filename in request for later use
+        req.originalImageName = uniqueSuffix + ext;
+        cb(null, req.originalImageName);
     }
 });
 
@@ -194,22 +204,64 @@ app.get('/api/products/:id', async (req, res) => {
     }
 });
 
+// Function to resize image and create thumbnail
+async function processImage(originalPath, filename) {
+    const ext = path.extname(filename);
+    const baseFilename = path.basename(filename, ext);
+    
+    // Create thumbnail filename
+    const thumbnailFilename = `${baseFilename}_thumb${ext}`;
+    const thumbnailPath = path.join('./uploads', thumbnailFilename);
+
+    // Resize original image (if larger than full size)
+    await sharp(originalPath)
+        .resize(IMAGE_SIZES.full.width, IMAGE_SIZES.full.height, {
+            fit: 'inside',
+            withoutEnlargement: true
+        })
+        .toFile(path.join('./uploads', `${baseFilename}_full${ext}`));
+
+    // Create thumbnail
+    await sharp(originalPath)
+        .resize(IMAGE_SIZES.thumbnail.width, IMAGE_SIZES.thumbnail.height, {
+            fit: 'cover'
+        })
+        .toFile(thumbnailPath);
+
+    // Delete original uploaded file
+    await fs.unlink(originalPath);
+
+    return {
+        full: `${baseFilename}_full${ext}`,
+        thumbnail: thumbnailFilename
+    };
+}
+
 app.post('/api/products', upload.single('image'), async (req, res) => {
     try {
-        console.log('Received product data:', req.body); // Debug log
-        console.log('Received file:', req.file); // Debug log
+        console.log('Received product data:', req.body);
+        console.log('Received file:', req.file);
 
         const { catid, name, price, description } = req.body;
-        const image = req.file ? req.file.filename : null;
+        let imageFiles = null;
 
-        // Validate required fields
-        if (!catid || !name || !price) {
-            return res.status(400).json({ error: 'Category, name, and price are required' });
+        if (req.file) {
+            imageFiles = await processImage(
+                req.file.path,
+                req.originalImageName
+            );
         }
 
         const [result] = await pool.query(
-            'INSERT INTO products (catid, name, price, description, image) VALUES (?, ?, ?, ?, ?)',
-            [catid, name, price, description || null, image]
+            'INSERT INTO products (catid, name, price, description, image, thumbnail) VALUES (?, ?, ?, ?, ?, ?)',
+            [
+                catid,
+                name,
+                price,
+                description || null,
+                imageFiles ? imageFiles.full : null,
+                imageFiles ? imageFiles.thumbnail : null
+            ]
         );
 
         res.json({
@@ -218,7 +270,8 @@ app.post('/api/products', upload.single('image'), async (req, res) => {
             name,
             price,
             description,
-            image
+            image: imageFiles ? imageFiles.full : null,
+            thumbnail: imageFiles ? imageFiles.thumbnail : null
         });
     } catch (error) {
         console.error('Error creating product:', error);
@@ -229,33 +282,48 @@ app.post('/api/products', upload.single('image'), async (req, res) => {
 app.put('/api/products/:id', upload.single('image'), async (req, res) => {
     try {
         const { catid, name, price, description } = req.body;
-        const image = req.file ? req.file.filename : null;
+        let imageFiles = null;
 
-        // If new image uploaded, delete old image
-        if (image) {
-            const [oldProduct] = await pool.query('SELECT image FROM products WHERE pid = ?', [req.params.id]);
+        if (req.file) {
+            // Delete old images if they exist
+            const [oldProduct] = await pool.query(
+                'SELECT image, thumbnail FROM products WHERE pid = ?',
+                [req.params.id]
+            );
+
             if (oldProduct[0].image) {
-                await fs.unlink(path.join('./uploads', oldProduct[0].image)).catch(() => {});
+                await fs.unlink(path.join('./uploads', oldProduct[0].image))
+                    .catch(() => {});
             }
+            if (oldProduct[0].thumbnail) {
+                await fs.unlink(path.join('./uploads', oldProduct[0].thumbnail))
+                    .catch(() => {});
+            }
+
+            imageFiles = await processImage(
+                req.file.path,
+                req.originalImageName
+            );
         }
 
-        const updateQuery = image
-            ? 'UPDATE products SET catid = ?, name = ?, price = ?, description = ?, image = ? WHERE pid = ?'
+        const updateQuery = imageFiles
+            ? 'UPDATE products SET catid = ?, name = ?, price = ?, description = ?, image = ?, thumbnail = ? WHERE pid = ?'
             : 'UPDATE products SET catid = ?, name = ?, price = ?, description = ? WHERE pid = ?';
-        
-        const updateParams = image
-            ? [catid, name, price, description, image, req.params.id]
+
+        const updateParams = imageFiles
+            ? [catid, name, price, description, imageFiles.full, imageFiles.thumbnail, req.params.id]
             : [catid, name, price, description, req.params.id];
 
         await pool.query(updateQuery, updateParams);
-        
+
         res.json({
             id: req.params.id,
             catid,
             name,
             price,
             description,
-            image: image || oldProduct[0].image
+            image: imageFiles ? imageFiles.full : undefined,
+            thumbnail: imageFiles ? imageFiles.thumbnail : undefined
         });
     } catch (error) {
         res.status(500).json({ error: error.message });

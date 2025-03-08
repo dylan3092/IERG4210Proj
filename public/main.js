@@ -55,8 +55,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             return `
                 <article class="product-item">
                     <a href="product.html?product=${product.pid}">
-                        <img src="${product.image ? 
-                            'http://s15.ierg4210.ie.cuhk.edu.hk:3000/uploads/' + product.image : 
+                        <img src="${product.thumbnail ? 
+                            `${BASE_URL}/uploads/${product.thumbnail}` : 
                             'images/default.jpg'}" 
                             alt="${product.name}" width="150" height="150">
                         <h3>${product.name}</h3>
