@@ -1,59 +1,54 @@
-// 购物车数据结构
+// Cart data structure
 let cart = {
-    items: [],
-    total: 0
+    items: {} // Using object with pid as key for easier lookup
 };
 
-// 初始化购物车功能
-document.addEventListener('DOMContentLoaded', () => {
-    // 从localStorage加载购物车数据（如果有）
-    loadCart();
+// Initialize cart functionality
+document.addEventListener('DOMContentLoaded', async () => {
+    // Load cart data from localStorage
+    await loadCart();
 
     // Add hover functionality to cart
     const cartSection = document.querySelector('.shopping-cart');
     const cartDetails = document.querySelector('.cart-details');
 
-    cartSection.addEventListener('mouseenter', () => {
-        cartDetails.style.display = 'block';
-    });
+    if (cartSection && cartDetails) {
+        cartSection.addEventListener('mouseenter', () => {
+            cartDetails.style.display = 'block';
+        });
 
-    cartSection.addEventListener('mouseleave', () => {
-        cartDetails.style.display = 'none';
-    });
+        cartSection.addEventListener('mouseleave', () => {
+            cartDetails.style.display = 'none';
+        });
+    }
 });
 
-// 添加商品到购物车
+// Add to cart function
 async function addToCart(productId, quantity = 1) {
     try {
-        // Fetch product details from API
-        const response = await fetch(`${BASE_URL}/api/products/${productId}`);
-        const product = await response.json();
-
         quantity = parseInt(quantity);
         if (isNaN(quantity) || quantity < 1) quantity = 1;
 
-        // 检查商品是否已在购物车中
-        const existingItem = cart.items.find(item => item.pid === product.pid);
-        
-        if (existingItem) {
-            existingItem.quantity += quantity;
+        // First, update the quantity in localStorage
+        if (cart.items[productId]) {
+            cart.items[productId].quantity += quantity;
         } else {
-            cart.items.push({
-                pid: product.pid,
-                name: product.name,
-                price: Number(product.price),
-                quantity: quantity
-            });
+            cart.items[productId] = {
+                quantity: quantity,
+                // We'll fetch name and price via AJAX
+            };
         }
-        
-        // 更新总价
-        updateTotal();
-        // 更新购物车显示
-        updateCartDisplay();
-        // 保存购物车数据
+
+        // Save to localStorage immediately
         saveCart();
+
+        // Then fetch latest product details via AJAX
+        await updateProductDetails(productId);
         
-        // 添加动画效果
+        // Update display
+        await updateCartDisplay();
+        
+        // Show feedback
         showAddedFeedback();
         
     } catch (error) {
@@ -61,73 +56,102 @@ async function addToCart(productId, quantity = 1) {
     }
 }
 
-// 更新购物车总价
-function updateTotal() {
-    cart.total = cart.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    document.getElementById('cart-total').textContent = `$${cart.total.toFixed(2)}`;
-    
-    // 更新结账按钮状态
-    const checkoutBtn = document.getElementById('checkout-btn');
-    checkoutBtn.disabled = cart.total === 0;
+// Fetch product details via AJAX
+async function updateProductDetails(productId) {
+    try {
+        const response = await fetch(`${BASE_URL}/api/products/${productId}`);
+        if (!response.ok) throw new Error('Product not found');
+        
+        const product = await response.json();
+        
+        // Update cart item with latest product details
+        cart.items[productId] = {
+            ...cart.items[productId],
+            name: product.name,
+            price: Number(product.price)
+        };
+        
+        // Save updated details to localStorage
+        saveCart();
+    } catch (error) {
+        console.error('Error fetching product details:', error);
+    }
 }
 
-// 更新购物车显示
-function updateCartDisplay() {
+// Update cart display
+async function updateCartDisplay() {
     const cartList = document.getElementById('cart-items');
-    cartList.innerHTML = cart.items.map(item => `
+    const cartTotal = document.getElementById('cart-total');
+    const checkoutBtn = document.getElementById('checkout-btn');
+    
+    if (!cartList || !cartTotal || !checkoutBtn) return;
+
+    // Ensure all product details are up to date
+    await Promise.all(
+        Object.keys(cart.items).map(pid => updateProductDetails(pid))
+    );
+
+    // Calculate total
+    const total = Object.values(cart.items).reduce(
+        (sum, item) => sum + (item.price * item.quantity), 
+        0
+    );
+
+    // Update display
+    cartList.innerHTML = Object.entries(cart.items).map(([pid, item]) => `
         <li>
             <span class="item-name">${item.name}</span>
             <div class="item-controls">
-                <button onclick="updateQuantity(${item.pid}, ${item.quantity - 1})">-</button>
+                <button onclick="updateQuantity(${pid}, ${item.quantity - 1})">-</button>
                 <span class="item-quantity">${item.quantity}</span>
-                <button onclick="updateQuantity(${item.pid}, ${item.quantity + 1})">+</button>
+                <button onclick="updateQuantity(${pid}, ${item.quantity + 1})">+</button>
             </div>
             <span class="item-price">$${(item.price * item.quantity).toFixed(2)}</span>
-            <button class="remove-item" onclick="removeFromCart(${item.pid})">×</button>
+            <button class="remove-item" onclick="removeFromCart(${pid})">×</button>
         </li>
     `).join('');
+
+    cartTotal.textContent = `$${total.toFixed(2)}`;
+    checkoutBtn.disabled = total === 0;
 }
 
-// 更新商品数量
-function updateQuantity(productId, newQuantity) {
+// Update item quantity
+async function updateQuantity(productId, newQuantity) {
     if (newQuantity < 1) {
-        removeFromCart(productId);
+        await removeFromCart(productId);
         return;
     }
 
-    const item = cart.items.find(item => item.pid === productId);
-    if (item) {
-        item.quantity = newQuantity;
-        updateTotal();
-        updateCartDisplay();
+    if (cart.items[productId]) {
+        cart.items[productId].quantity = newQuantity;
         saveCart();
+        await updateCartDisplay();
     }
 }
 
-// 从购物车中移除商品
-function removeFromCart(productId) {
-    cart.items = cart.items.filter(item => item.pid !== productId);
-    updateTotal();
-    updateCartDisplay();
+// Remove from cart
+async function removeFromCart(productId) {
+    delete cart.items[productId];
     saveCart();
+    await updateCartDisplay();
 }
 
-// 保存购物车数据到localStorage
+// Save cart to localStorage
 function saveCart() {
     localStorage.setItem('shopping_cart', JSON.stringify(cart));
 }
 
-// 从localStorage加载购物车数据
-function loadCart() {
+// Load cart from localStorage and fetch product details
+async function loadCart() {
     const savedCart = localStorage.getItem('shopping_cart');
     if (savedCart) {
         cart = JSON.parse(savedCart);
-        updateTotal();
-        updateCartDisplay();
+        // Fetch latest product details for all items
+        await updateCartDisplay();
     }
 }
 
-// 添加商品时的视觉反馈
+// Show added to cart feedback
 function showAddedFeedback() {
     const feedback = document.createElement('div');
     feedback.className = 'add-to-cart-feedback';
