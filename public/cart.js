@@ -25,19 +25,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // Add to cart function
 async function addToCart(productId, quantity = 1) {
+    console.log('Adding to cart:', productId, quantity);
     try {
         quantity = parseInt(quantity);
         if (isNaN(quantity) || quantity < 1) quantity = 1;
 
         // First, update the quantity in localStorage
-        if (cart.items[productId]) {
-            cart.items[productId].quantity += quantity;
-        } else {
+        if (!cart.items[productId]) {
             cart.items[productId] = {
-                quantity: quantity,
-                // We'll fetch name and price via AJAX
+                quantity: 0,
             };
         }
+        cart.items[productId].quantity += quantity;
 
         // Save to localStorage immediately
         saveCart();
@@ -58,11 +57,13 @@ async function addToCart(productId, quantity = 1) {
 
 // Fetch product details via AJAX
 async function updateProductDetails(productId) {
+    console.log('Fetching product details for:', productId);
     try {
         const response = await fetch(`${BASE_URL}/api/products/${productId}`);
         if (!response.ok) throw new Error('Product not found');
         
         const product = await response.json();
+        console.log('Received product details:', product);
         
         // Update cart item with latest product details
         cart.items[productId] = {
