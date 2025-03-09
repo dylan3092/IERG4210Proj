@@ -3,7 +3,7 @@ let categoriesCache = [];
 
 // Initialize the application
 document.addEventListener('DOMContentLoaded', async () => {
-    // Initialize router
+    // Initialize router with a more specific selector
     router.init('main');
     
     // Register routes

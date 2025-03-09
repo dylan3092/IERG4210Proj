@@ -77,7 +77,9 @@ class Router {
     // Handle route changes
     async handleRouteChange(path) {
         // Show loading state
-        this.contentContainer.classList.add('loading');
+        if (this.contentContainer) {
+            this.contentContainer.classList.add('loading');
+        }
         
         // Find matching route handler
         let handler = null;
@@ -110,7 +112,7 @@ class Router {
                 const content = await handler(params);
                 
                 // Update the content container
-                if (content) {
+                if (content && this.contentContainer) {
                     this.contentContainer.innerHTML = content;
                 }
                 
@@ -119,14 +121,16 @@ class Router {
                 
             } catch (error) {
                 console.error('Error handling route:', error);
-                if (this.routes['error']) {
+                if (this.routes['error'] && this.contentContainer) {
                     this.contentContainer.innerHTML = await this.routes['error'](error);
                 }
             }
         }
 
         // Remove loading state
-        this.contentContainer.classList.remove('loading');
+        if (this.contentContainer) {
+            this.contentContainer.classList.remove('loading');
+        }
     }
 
     // Match route patterns (e.g., /product/:id)

@@ -302,6 +302,13 @@ class CartUIController {
             feedback.remove();
         }, 2000);
     }
+
+    // Add this method to handle item removal
+    removeItem(productId) {
+        if (this.cart.items[productId]) {
+            this.cart.removeItem(productId);
+        }
+    }
 }
 
 // Create global instances
