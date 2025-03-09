@@ -25,7 +25,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const currentPath = window.location.pathname + window.location.search;
     initializePageStructure(currentPath);
     
-    router.navigate(currentPath);
+    router.handleRouteChange(currentPath);
 });
 
 // Load categories once and cache them
