@@ -111,9 +111,35 @@ class Router {
                 this.currentRoute = path;
                 const content = await handler(params);
                 
-                // Update the content container
+                // Update only the content section, not the entire main element
                 if (content && this.contentContainer) {
-                    this.contentContainer.innerHTML = content;
+                    // Check if we're on the home page or product page
+                    const isProductPage = path.includes('product.html');
+                    
+                    // Find the appropriate content section to update
+                    const contentSection = isProductPage 
+                        ? this.contentContainer.querySelector('.product-details') 
+                        : this.contentContainer.querySelector('.product-list');
+                    
+                    if (contentSection) {
+                        contentSection.innerHTML = content;
+                    } else {
+                        // If the section doesn't exist yet, we need to create the structure
+                        this.contentContainer.innerHTML = `
+                            <aside>
+                                <h2>Categories</h2>
+                                <ul></ul>
+                            </aside>
+                            <section class="${isProductPage ? 'product-details' : 'product-list'}">
+                                ${content}
+                            </section>
+                        `;
+                        
+                        // After creating the structure, we need to re-render categories
+                        if (typeof renderCategories === 'function') {
+                            renderCategories();
+                        }
+                    }
                 }
                 
                 // Emit route changed event
@@ -122,7 +148,11 @@ class Router {
             } catch (error) {
                 console.error('Error handling route:', error);
                 if (this.routes['error'] && this.contentContainer) {
-                    this.contentContainer.innerHTML = await this.routes['error'](error);
+                    const errorSection = this.contentContainer.querySelector('.product-list') || 
+                                        this.contentContainer.querySelector('.product-details');
+                    if (errorSection) {
+                        errorSection.innerHTML = await this.routes['error'](error);
+                    }
                 }
             }
         }

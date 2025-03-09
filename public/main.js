@@ -16,6 +16,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Load categories (shared across all pages)
     await loadCategories();
     
+    // Listen for route changes to update categories
+    router.on('routeChanged', () => {
+        renderCategories();
+    });
+    
     // Router will handle initial route
 });
 
@@ -37,28 +42,27 @@ async function loadCategories() {
 
 // Render categories in sidebar
 function renderCategories() {
-    const currentCategory = router.getQueryParams().category;
-    const categoriesList = document.querySelector('aside ul');
+    const categoryLists = document.querySelectorAll('aside ul');
+    if (!categoryLists.length) return; // No category lists found
     
-    if (!categoriesList) return;
+    // Get current category from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const currentCategoryId = urlParams.get('category');
     
-    categoriesList.innerHTML = categoriesCache.map(category => `
-        <li>
-            <a href="/?category=${category.catid}" 
-               class="${currentCategory == category.catid ? 'active' : ''}">
-                ${category.name}
-            </a>
-        </li>
-    `).join('');
-    
-    // Add "All Products" option
-    categoriesList.insertAdjacentHTML('afterbegin', `
-        <li>
-            <a href="/" class="${!currentCategory ? 'active' : ''}">
-                All Products
-            </a>
-        </li>
-    `);
+    // Update all category lists
+    categoryLists.forEach(categoryList => {
+        categoryList.innerHTML = categoriesCache.map(category => {
+            const isActive = currentCategoryId == category.catid;
+            return `
+                <li>
+                    <a href="/?category=${category.catid}" 
+                       class="${isActive ? 'active' : ''}">
+                        ${category.name}
+                    </a>
+                </li>
+            `;
+        }).join('');
+    });
 }
 
 // Home page handler
@@ -90,7 +94,7 @@ async function homeHandler(params) {
         // Highlight active category
         renderCategories();
         
-        // Return HTML for products
+        // Return HTML for products only
         if (products.length === 0) {
             return '<p>No products found in this category.</p>';
         }
