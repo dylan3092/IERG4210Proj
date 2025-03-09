@@ -332,3 +332,20 @@ function removeFromCart(productId) {
 document.addEventListener('DOMContentLoaded', async () => {
     await cart.load();
 });
+
+// Load cart data
+cart.load();
+
+// Expose cart controller to window for button click handlers
+window.cartController = cartController;
+
+// Add these methods to CartUIController class
+CartUIController.prototype.updateQuantity = function(productId, newQuantity) {
+  this.cart.updateQuantity(productId, newQuantity);
+  this.updateDisplay();
+};
+
+CartUIController.prototype.removeItem = function(productId) {
+  this.cart.removeItem(productId);
+  this.updateDisplay();
+};
