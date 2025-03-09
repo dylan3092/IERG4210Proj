@@ -297,9 +297,16 @@ class CartUIController {
         feedback.className = 'add-to-cart-feedback';
         feedback.textContent = 'Added to cart!';
         document.body.appendChild(feedback);
-
+        
+        // Remove the feedback after animation completes
         setTimeout(() => {
-            feedback.remove();
+            feedback.style.opacity = '0';
+            feedback.style.transform = 'translateY(-20px) translateX(-50%)';
+            feedback.style.transition = 'opacity 0.3s, transform 0.3s';
+            
+            setTimeout(() => {
+                feedback.remove();
+            }, 300);
         }, 2000);
     }
 
