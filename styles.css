@@ -329,3 +329,17 @@ aside ul li a.active {
     margin: 0 5px;
     color: #666;
 }
+
+/* Page title styling */
+.page-title {
+  text-align: center;
+  padding: 1rem 0;
+  background-color: #f8f8f8;
+  border-bottom: 1px solid #eee;
+}
+
+.page-title h1 {
+  font-size: 1.8rem;
+  color: #333;
+  margin: 0;
+}
