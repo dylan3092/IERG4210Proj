@@ -1,60 +1,107 @@
+// Global state for categories
+let categoriesCache = [];
+
+// Initialize the application
 document.addEventListener('DOMContentLoaded', async () => {
-    // Get current category from URL if exists
-    const urlParams = new URLSearchParams(window.location.search);
-    const currentCategory = urlParams.get('category');
+    // Initialize router
+    router.init('main');
     
-    // Fetch categories
+    // Register routes
+    router.register('/', homeHandler);
+    router.register('/index.html', homeHandler);
+    router.register('/product.html', productHandler);
+    router.register('404', notFoundHandler);
+    router.register('error', errorHandler);
+    
+    // Load categories (shared across all pages)
+    await loadCategories();
+    
+    // Router will handle initial route
+});
+
+// Load categories once and cache them
+async function loadCategories() {
     try {
-        console.log('Fetching categories...');
-        const response = await fetch('http://s15.ierg4210.ie.cuhk.edu.hk:3000/api/categories');
-        const categories = await response.json();
+        const response = await fetch(`${BASE_URL}/api/categories`);
+        categoriesCache = await response.json();
         
-        const categoriesList = document.querySelector('aside ul');
-        categoriesList.innerHTML = categories.map(category => `
-            <li>
-                <a href="?category=${category.catid}" 
-                   class="${currentCategory == category.catid ? 'active' : ''}">
-                    ${category.name}
-                </a>
-            </li>
-        `).join('');
+        // Render categories in sidebar
+        renderCategories();
         
-        // Add "All Products" option
-        categoriesList.insertAdjacentHTML('afterbegin', `
-            <li>
-                <a href="/" class="${!currentCategory ? 'active' : ''}">
-                    All Products
-                </a>
-            </li>
-        `);
+        return categoriesCache;
     } catch (error) {
         console.error('Error fetching categories:', error);
+        return [];
     }
+}
 
-    // Fetch products based on category
+// Render categories in sidebar
+function renderCategories() {
+    const currentCategory = router.getQueryParams().category;
+    const categoriesList = document.querySelector('aside ul');
+    
+    if (!categoriesList) return;
+    
+    categoriesList.innerHTML = categoriesCache.map(category => `
+        <li>
+            <a href="/?category=${category.catid}" 
+               class="${currentCategory == category.catid ? 'active' : ''}">
+                ${category.name}
+            </a>
+        </li>
+    `).join('');
+    
+    // Add "All Products" option
+    categoriesList.insertAdjacentHTML('afterbegin', `
+        <li>
+            <a href="/" class="${!currentCategory ? 'active' : ''}">
+                All Products
+            </a>
+        </li>
+    `);
+}
+
+// Home page handler
+async function homeHandler(params) {
+    // Get category from params
+    const categoryId = params.category;
+    
     try {
-        console.log('Fetching products...');
-        const productsUrl = currentCategory 
-            ? `http://s15.ierg4210.ie.cuhk.edu.hk:3000/api/products?category=${currentCategory}`
-            : 'http://s15.ierg4210.ie.cuhk.edu.hk:3000/api/products';
+        // Fetch products based on category
+        const productsUrl = categoryId 
+            ? `${BASE_URL}/api/products?category=${categoryId}`
+            : `${BASE_URL}/api/products`;
             
         const response = await fetch(productsUrl);
         const products = await response.json();
         
-        const productList = document.querySelector('.product-list');
-        
-        if (products.length === 0) {
-            productList.innerHTML = '<p>No products found in this category.</p>';
-            return;
+        // Update page title and breadcrumb based on category
+        if (categoryId) {
+            const selectedCategory = categoriesCache.find(c => c.catid == categoryId);
+            if (selectedCategory) {
+                document.title = `${selectedCategory.name} - Dummy Shopping`;
+                updateBreadcrumb(selectedCategory.name);
+            }
+        } else {
+            document.title = 'Dummy Shopping - Home';
+            updateBreadcrumb();
         }
         
-        productList.innerHTML = products.map(product => {
+        // Highlight active category
+        renderCategories();
+        
+        // Return HTML for products
+        if (products.length === 0) {
+            return '<p>No products found in this category.</p>';
+        }
+        
+        return products.map(product => {
             const price = typeof product.price === 'number' ? 
                 product.price : Number(product.price);
             
             return `
                 <article class="product-item">
-                    <a href="product.html?product=${product.pid}">
+                    <a href="/product.html?product=${product.pid}">
                         <img src="${product.thumbnail ? 
                             `${BASE_URL}/uploads/${product.thumbnail}` : 
                             'images/default.jpg'}" 
@@ -66,27 +113,97 @@ document.addEventListener('DOMContentLoaded', async () => {
                 </article>
             `;
         }).join('');
-
-        // Update page title and breadcrumb based on category
-        if (currentCategory) {
-            const selectedCategory = categories.find(c => c.catid == currentCategory);
-            if (selectedCategory) {
-                document.title = `${selectedCategory.name} - Dummy Shopping`;
-                updateBreadcrumb(selectedCategory.name);
-            }
-        }
-
+        
     } catch (error) {
         console.error('Error fetching products:', error);
-        console.error('Error details:', error.stack);
+        return '<p>Error loading products. Please try again later.</p>';
     }
-});
+}
+
+// Product page handler
+async function productHandler(params) {
+    // Get product ID from params
+    const productId = params.product;
+    
+    if (!productId) {
+        router.navigate('/');
+        return '';
+    }
+    
+    try {
+        // Fetch product details
+        const productResponse = await fetch(`${BASE_URL}/api/products/${productId}`);
+        if (!productResponse.ok) {
+            throw new Error('Product not found');
+        }
+        
+        const product = await productResponse.json();
+        
+        // Update page title
+        document.title = `${product.name} - Dummy Shopping`;
+        
+        // Update breadcrumb using category_name from API
+        updateBreadcrumb(product.category_name, product.name);
+        
+        // Highlight active category
+        renderCategories();
+        
+        // Return HTML for product details
+        return `
+            <div class="product-details">
+                <div class="product-image">
+                    <img src="${product.image ? 
+                        `${BASE_URL}/uploads/${product.image}` : 
+                        'images/default.jpg'}" 
+                        alt="${product.name}">
+                </div>
+                <div class="product-info">
+                    <h1>${product.name}</h1>
+                    <p class="category">Category: ${product.category_name}</p>
+                    <p class="price">$${Number(product.price).toFixed(2)}</p>
+                    <p class="description">${product.description}</p>
+                    <div class="purchase-controls">
+                        <input type="number" id="quantity" value="1" min="1" max="99">
+                        <button onclick="addToCart(${product.pid}, document.getElementById('quantity').value)">
+                            Add to Cart
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+    } catch (error) {
+        console.error('Error:', error);
+        return '<p class="error">Product not found</p>';
+    }
+}
+
+// 404 handler
+function notFoundHandler() {
+    document.title = '404 - Page Not Found';
+    return '<h1>404 - Page Not Found</h1><p>The page you are looking for does not exist.</p>';
+}
+
+// Error handler
+function errorHandler(error) {
+    document.title = 'Error';
+    return `<h1>Error</h1><p>${error.message || 'An unknown error occurred.'}</p>`;
+}
 
 // Function to update breadcrumb
-function updateBreadcrumb(categoryName) {
+function updateBreadcrumb(categoryName, productName) {
     const breadcrumb = document.querySelector('.breadcrumb');
+    if (!breadcrumb) return;
+    
     breadcrumb.innerHTML = `
         <a href="/">Home</a>
-        ${categoryName ? `<span class="separator"> > </span><span>${categoryName}</span>` : ''}
+        ${categoryName ? `<span class="separator"> > </span><a href="/?category=${getCategoryId(categoryName)}">${categoryName}</a>` : ''}
+        ${productName ? `<span class="separator"> > </span><span>${productName}</span>` : ''}
     `;
+}
+
+// Helper to get category ID from name
+function getCategoryId(categoryName) {
+    const category = categoriesCache.find(c => c.name === categoryName);
+    return category ? category.catid : '';
 }

@@ -2,8 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Product Details - Dummy Shopping</title>
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="http://s15.ierg4210.ie.cuhk.edu.hk:3000/dynamic.css">
 </head>
 <body>
   <header>
@@ -36,6 +38,7 @@
 
     <section class="product-details">
       <!-- Product details will be populated by JavaScript -->
+      <div class="loading-indicator">Loading product details...</div>
     </section>
   </main>
 
@@ -47,8 +50,11 @@
     // Define the base URL with port 3000
     const BASE_URL = 'http://s15.ierg4210.ie.cuhk.edu.hk:3000';
   </script>
-  <!-- Update script sources to include port 3000 -->
-  <script src="http://s15.ierg4210.ie.cuhk.edu.hk:3000/product.js"></script>
+  <!-- Load router first -->
+  <script src="http://s15.ierg4210.ie.cuhk.edu.hk:3000/router.js"></script>
+  <!-- Then load cart -->
   <script src="http://s15.ierg4210.ie.cuhk.edu.hk:3000/cart.js"></script>
+  <!-- Finally load main.js which depends on both -->
+  <script src="http://s15.ierg4210.ie.cuhk.edu.hk:3000/main.js"></script>
 </body>
 </html>
