@@ -81,6 +81,11 @@ class Router {
             this.contentContainer.classList.add('loading');
         }
         
+        // Check if we need to initialize the page structure
+        if (typeof initializePageStructure === 'function') {
+            initializePageStructure(path);
+        }
+        
         // Find matching route handler
         let handler = null;
         let params = {};

@@ -21,6 +21,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         renderCategories();
     });
     
+    // Check if we need to initialize the page structure
+    const currentPath = window.location.pathname + window.location.search;
+    initializePageStructure(currentPath);
+    
     // Router will handle initial route
 });
 
@@ -51,7 +55,17 @@ function renderCategories() {
     
     // Update all category lists
     categoryLists.forEach(categoryList => {
-        categoryList.innerHTML = categoriesCache.map(category => {
+        // Start with "All Products" option
+        let categoriesHTML = `
+            <li>
+                <a href="/" class="${!currentCategoryId ? 'active' : ''}">
+                    All Products
+                </a>
+            </li>
+        `;
+        
+        // Add the rest of the categories
+        categoriesHTML += categoriesCache.map(category => {
             const isActive = currentCategoryId == category.catid;
             return `
                 <li>
@@ -62,6 +76,8 @@ function renderCategories() {
                 </li>
             `;
         }).join('');
+        
+        categoryList.innerHTML = categoriesHTML;
     });
 }
 
@@ -210,4 +226,35 @@ function updateBreadcrumb(categoryName, productName) {
 function getCategoryId(categoryName) {
     const category = categoriesCache.find(c => c.name === categoryName);
     return category ? category.catid : '';
+}
+
+// Function to initialize the page structure based on the current path
+function initializePageStructure(path) {
+    const mainElement = document.querySelector('main');
+    if (!mainElement) return;
+    
+    // Check if we're on the product page
+    const isProductPage = path.includes('product.html');
+    
+    // Check if the required sections exist
+    const hasAside = mainElement.querySelector('aside');
+    const hasContentSection = isProductPage 
+        ? mainElement.querySelector('.product-details')
+        : mainElement.querySelector('.product-list');
+    
+    // If the structure is incomplete, create it
+    if (!hasAside || !hasContentSection) {
+        mainElement.innerHTML = `
+            <aside>
+                <h2>Categories</h2>
+                <ul></ul>
+            </aside>
+            <section class="${isProductPage ? 'product-details' : 'product-list'}">
+                <div class="loading-indicator">Loading content...</div>
+            </section>
+        `;
+        
+        // Re-render categories
+        renderCategories();
+    }
 }
