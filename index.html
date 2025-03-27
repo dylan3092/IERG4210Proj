@@ -40,7 +40,7 @@
         <div class="user-actions">
           <button onclick="window.location.href='login.html'" id="login-link" class="link-button">Login</button>
           <a href="#" id="logout-link" style="display: none;">Logout</a>
-          <a href="admin.html" id="admin-link" style="display: none;">Admin Panel</a>
+          <a href="/admin" id="admin-link" style="display: none;">Admin Panel</a>
         </div>
       </div>
     </div>
@@ -111,11 +111,11 @@
           e.preventDefault();
           
           try {
-            const response = await fetch(`${BASE_URL}/logout`, {
+            const response = await fetch('/api/logout', {
               method: 'POST',
+              credentials: 'include',
               headers: {
-                'Content-Type': 'application/json',
-                'CSRF-Token': sessionStorage.getItem('csrfToken')
+                'Content-Type': 'application/json'
               }
             });
             
@@ -127,9 +127,13 @@
               
               // Refresh the page
               window.location.reload();
+            } else {
+              console.error('Logout failed:', await response.text());
+              alert('Failed to logout. Please try again.');
             }
           } catch (error) {
             console.error('Logout error:', error);
+            alert('Network error during logout. Please try again.');
           }
         });
       }

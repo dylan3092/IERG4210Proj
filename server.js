@@ -294,16 +294,16 @@ app.use((req, res, next) => {
 // Apply cookie parser middleware
 app.use(cookieParser());
 
-// Skip CSRF for login and API routes
+// Skip CSRF for login, logout, and API routes
 app.use((req, res, next) => {
-    // For login endpoint, completely skip all protection since we're in development
-    if (req.path === '/api/login') {
-        console.log('Completely bypassing protection for login endpoint');
+    // For login and logout endpoints, completely bypass protection
+    if (req.path === '/api/login' || req.path === '/api/logout') {
+        console.log('Completely bypassing protection for endpoint:', req.path);
         next();
         return;
     }
     
-    // Skip CSRF for login endpoint and API endpoints that need to be accessed cross-origin
+    // Skip CSRF for API endpoints that need to be accessed cross-origin
     if (req.path === '/api/categories' || req.path === '/api/products' || 
         req.path.startsWith('/api/products/')) {
         console.log('Skipping CSRF for:', req.path);
@@ -324,8 +324,8 @@ app.use((req, res, next) => {
 
 // Apply CSRF validation for non-exempt routes
 app.use((req, res, next) => {
-    // For login endpoint, already skipped in previous middleware
-    if (req.path === '/api/login') {
+    // For login and logout endpoints, already skipped in previous middleware
+    if (req.path === '/api/login' || req.path === '/api/logout') {
         next();
         return;
     }
@@ -987,6 +987,11 @@ app.get('/login.html', (req, res) => {
 
 // Add specific route for admin page
 app.get('/admin.html', (req, res) => {
+    res.sendFile(path.join(__dirname, 'admin.html'));
+});
+
+// Serve admin page directly
+app.get('/admin', (req, res) => {
     res.sendFile(path.join(__dirname, 'admin.html'));
 });
 

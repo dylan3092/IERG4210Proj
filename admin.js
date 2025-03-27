@@ -287,8 +287,9 @@ document.getElementById('product-form').addEventListener('submit', handleProduct
 // Handle user logout
 const handleLogout = async () => {
     try {
-        const response = await safeFetch(`${BASE_URL}/api/logout`, {
+        const response = await fetch('/api/logout', {
             method: 'POST',
+            credentials: 'include',
             headers: {
                 'Content-Type': 'application/json'
             }
@@ -303,6 +304,8 @@ const handleLogout = async () => {
             // Redirect to login page
             window.location.href = '/login.html';
         } else {
+            const errorText = await response.text();
+            console.error('Logout failed:', errorText);
             showMessage('Logout failed. Please try again.', true);
         }
     } catch (error) {
