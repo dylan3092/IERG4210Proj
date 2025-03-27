@@ -73,8 +73,9 @@
   </footer>
 
   <script>
-    // Define the base URL
-    const BASE_URL = 'http://s15.ierg4210.ie.cuhk.edu.hk:3000/api';
+    const BASE_URL = window.location.protocol === 'https:' ? 
+        'https://s15.ierg4210.ie.cuhk.edu.hk/api' : 
+        'http://s15.ierg4210.ie.cuhk.edu.hk:3000/api';
     
     // Check if user is logged in
     document.addEventListener('DOMContentLoaded', () => {

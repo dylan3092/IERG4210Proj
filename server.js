@@ -1410,10 +1410,46 @@ app.get('/api/auth/status', (req, res) => {
     }
 });
 
-// Start server
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-}).on('error', (err) => {
-    console.error('Server failed to start:', err);
+// Existing HTTP server code - keep this for redirection
+const httpPort = process.env.PORT || 3000;
+const server = app.listen(httpPort, () => {
+    console.log(`Server is listening on port ${httpPort}`);
+    console.log(`Try opening http://localhost:${httpPort} in your browser`);
+});
+
+// Add HTTPS support using Let's Encrypt certificates
+const https = require('https');
+
+// Check if SSL certificates exist before trying to create HTTPS server
+try {
+    // Path to Let's Encrypt certificates
+    const sslOptions = {
+        key: fs.readFileSync('/etc/letsencrypt/live/s15.ierg4210.ie.cuhk.edu.hk/privkey.pem'),
+        cert: fs.readFileSync('/etc/letsencrypt/live/s15.ierg4210.ie.cuhk.edu.hk/fullchain.pem')
+    };
+
+    // Create HTTPS server
+    const httpsServer = https.createServer(sslOptions, app);
+    const httpsPort = 443;
+    
+    httpsServer.listen(httpsPort, () => {
+        console.log(`HTTPS Server running on port ${httpsPort}`);
+        console.log(`Try opening https://s15.ierg4210.ie.cuhk.edu.hk in your browser`);
+    });
+    
+    console.log('SSL enabled with Let\'s Encrypt certificates');
+} catch (error) {
+    console.log('SSL certificates not found or permission issue. Running in HTTP mode only.');
+    console.log('To enable HTTPS, install Let\'s Encrypt certificates and restart the server.');
+    console.log('Error details:', error.message);
+}
+
+// Add middleware to redirect HTTP to HTTPS in production
+app.use((req, res, next) => {
+    // Check if request is HTTP and not localhost
+    if (!req.secure && req.hostname !== 'localhost' && req.hostname !== '127.0.0.1') {
+        // Redirect to HTTPS with same host and URL
+        return res.redirect(`https://${req.headers.host}${req.url}`);
+    }
+    next();
 }); 
