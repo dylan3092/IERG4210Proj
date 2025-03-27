@@ -285,6 +285,12 @@ app.use((req, res, next) => {
     next();
 });
 
+// Add request logging middleware
+app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+    next();
+});
+
 // Apply cookie parser middleware
 app.use(cookieParser());
 
@@ -542,7 +548,8 @@ app.get('/api/categories', async (req, res) => {
     try {
         console.log('Fetching categories from database...');
         const [rows] = await pool.query('SELECT * FROM categories');
-        console.log('Categories fetched:', rows);
+        console.log('Categories fetched:', rows.length, 'items');
+        console.log('Categories data:', JSON.stringify(rows));
         res.json(rows);
     } catch (error) {
         console.error('Error fetching categories:', error);
