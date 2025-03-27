@@ -35,6 +35,28 @@ document.addEventListener('DOMContentLoaded', async () => {
 async function loadCategories() {
     try {
         const response = await fetch(`${BASE_URL}/api/categories`);
+        
+        if (!response.ok) {
+            console.error('Failed to load categories:', response.status, response.statusText);
+            const categoryLists = document.querySelectorAll('aside ul');
+            
+            // If the error is due to authentication, suggest logging in
+            if (response.status === 401) {
+                categoryLists.forEach(list => {
+                    list.innerHTML = `
+                        <li class="error">Login required to view categories</li>
+                        <li><a href="login.html" class="login-btn">Login</a></li>
+                    `;
+                });
+            } else {
+                categoryLists.forEach(list => {
+                    list.innerHTML = '<li class="error">Error loading categories</li>';
+                });
+            }
+            
+            return [];
+        }
+        
         categoriesCache = await response.json();
         
         // Render categories in sidebar
@@ -43,6 +65,10 @@ async function loadCategories() {
         return categoriesCache;
     } catch (error) {
         console.error('Error fetching categories:', error);
+        const categoryLists = document.querySelectorAll('aside ul');
+        categoryLists.forEach(list => {
+            list.innerHTML = '<li class="error">Error loading categories</li>';
+        });
         return [];
     }
 }
@@ -96,6 +122,21 @@ async function homeHandler(params) {
             : `${BASE_URL}/api/products`;
             
         const response = await fetch(productsUrl);
+        
+        if (!response.ok) {
+            console.error('Failed to load products:', response.status, response.statusText);
+            
+            // If the error is due to authentication, suggest logging in
+            if (response.status === 401) {
+                return `
+                    <p class="error">You need to be logged in to view products.</p>
+                    <p><a href="login.html" class="btn btn-primary">Login</a></p>
+                `;
+            }
+            
+            return `<p class="error">Error loading products. Server returned: ${response.status} ${response.statusText}</p>`;
+        }
+        
         const products = await response.json();
         
         // Update page title and breadcrumb based on category

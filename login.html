@@ -77,8 +77,8 @@
         // Check if already logged in
         fetch(`${BASE_URL}/api/categories`)
             .then(response => {
-                if (response.ok) {
-                    // Already authenticated, redirect to admin page
+                if (response.ok && sessionStorage.getItem('isAdmin') === 'true') {
+                    // Already authenticated as admin, redirect to admin page
                     window.location.href = 'admin.html';
                 }
             })
