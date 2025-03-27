@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin Panel - Dummy Shop</title>
+    <style>
+        .form-group { margin-bottom: 15px; }
+        .error { color: red; }
+        .success { color: green; }
+        .preview-image { max-width: 200px; }
+    </style>
+</head>
+<body>
+    <h1>Admin Panel</h1>
+    
+    <!-- Categories Management Section -->
+    <section id="categories-section">
+        <h2>Manage Categories</h2>
+        
+        <!-- Add/Update Category Form -->
+        <form id="category-form" enctype="multipart/form-data">
+            <input type="hidden" id="category-id" name="catid">
+            <div class="form-group">
+                <label for="category-name">Category Name:</label>
+                <input type="text" id="category-name" name="name" required 
+                       pattern="[A-Za-z0-9\s]{2,50}" 
+                       title="2-50 characters, alphanumeric only">
+            </div>
+            <button type="submit">Save Category</button>
+        </form>
+
+        <!-- Categories List -->
+        <div id="categories-list">
+            <!-- Categories will be loaded here dynamically -->
+        </div>
+    </section>
+
+    <!-- Products Management Section -->
+    <section id="products-section">
+        <h2>Manage Products</h2>
+        
+        <!-- Add/Update Product Form -->
+        <form id="product-form" enctype="multipart/form-data">
+            <input type="hidden" id="product-id" name="pid">
+            
+            <div class="form-group">
+                <label for="product-category">Category:</label>
+                <select id="product-category" name="catid" required>
+                    <!-- Categories will be loaded here dynamically -->
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="product-name">Product Name:</label>
+                <input type="text" id="product-name" name="name" required
+                       pattern="[A-Za-z0-9\s]{2,100}"
+                       title="2-100 characters, alphanumeric only">
+            </div>
+
+            <div class="form-group">
+                <label for="product-price">Price:</label>
+                <input type="number" id="product-price" name="price" required
+                       min="0" step="0.01">
+            </div>
+
+            <div class="form-group">
+                <label for="product-description">Description:</label>
+                <textarea id="product-description" name="description" required
+                          minlength="10" maxlength="1000"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="product-image">Product Image:</label>
+                <input type="file" id="product-image" name="image"
+                       accept="image/jpeg,image/png,image/gif">
+                <div id="image-preview"></div>
+            </div>
+
+            <button type="submit">Save Product</button>
+        </form>
+
+        <!-- Products List -->
+        <div id="products-list">
+            <!-- Products will be loaded here dynamically -->
+        </div>
+    </section>
+
+    <script src="admin.js"></script>
+</body>
+</html> 

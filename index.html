@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dummy Shopping - Home</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="http://s15.ierg4210.ie.cuhk.edu.hk:3000/dynamic.css">
+</head>
+<body>
+  <!-- Add a visible page title at the top -->
+  <div class="page-title">
+    <h1>Neon</h1>
+  </div>
+  
+  <header>
+    <nav class="breadcrumb">
+      <!-- Hierarchical navigation: on the main page, only "Home" is shown -->
+      <a href="index.html">Home</a>
+    </nav>
+  </header>
+
+  <!-- Hover-based cart that appears in both main and product pages -->
+  <section class="shopping-cart">
+    <div class="cart-summary">
+      <!-- Collapsed view showing total price -->
+      <p>Total: <span id="cart-total">$0.00</span></p>
+    </div>
+    <div class="cart-details">
+      <!-- Expanded view on hover, showing details of items -->
+      <h2>Shopping List</h2>
+      <ul id="cart-items">
+        <!-- Cart items will be dynamically added here -->
+      </ul>
+      <button type="submit" id="checkout-btn" disabled>Checkout</button>
+    </div>
+  </section>
+
+  <main>
+    <!-- Left column: Categories list -->
+    <aside>
+      <h2>Categories</h2>
+      <ul>
+        <!-- Categories will be populated by JavaScript -->
+      </ul>
+    </aside>
+
+    <!-- Right column: Product list -->
+    <section class="product-list">
+      <!-- Products will be populated by JavaScript -->
+      <div class="loading-indicator">Loading products...</div>
+    </section>
+  </main>
+
+  <footer>
+    <p>1155175347</p>
+  </footer>
+
+  <!-- Add these scripts right before closing body tag -->
+  <script>
+    const BASE_URL = 'http://s15.ierg4210.ie.cuhk.edu.hk:3000';
+  </script>
+  <!-- Load router first -->
+  <script src="http://s15.ierg4210.ie.cuhk.edu.hk:3000/router.js"></script>
+  <!-- Then load cart -->
+  <script src="http://s15.ierg4210.ie.cuhk.edu.hk:3000/cart.js"></script>
+  <!-- Finally load main.js which depends on both -->
+  <script src="http://s15.ierg4210.ie.cuhk.edu.hk:3000/main.js"></script>
+</body>
+</html>
