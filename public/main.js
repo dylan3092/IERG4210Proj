@@ -8,7 +8,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // Register routes
     router.register('/', homeHandler);
+    router.register('', homeHandler); // Handle empty path
+    router.register('index.html', homeHandler);
     router.register('/index.html', homeHandler);
+    router.register('product.html', productHandler);
     router.register('/product.html', productHandler);
     router.register('404', notFoundHandler);
     router.register('error', errorHandler);
@@ -58,7 +61,7 @@ function renderCategories() {
         // Start with "All Products" option
         let categoriesHTML = `
             <li>
-                <a href="/" class="${!currentCategoryId ? 'active' : ''}">
+                <a href="index.html" class="${!currentCategoryId ? 'active' : ''}">
                     All Products
                 </a>
             </li>
@@ -121,7 +124,7 @@ async function homeHandler(params) {
             
             return `
                 <article class="product-item">
-                    <a href="/product.html?product=${sanitize.attribute(product.pid)}">
+                    <a href="product.html?product=${sanitize.attribute(product.pid)}">
                         <img src="${product.thumbnail ? 
                             sanitize.url(`${BASE_URL}/uploads/${product.thumbnail}`) : 
                             'images/default.jpg'}" 
@@ -146,7 +149,7 @@ async function productHandler(params) {
     const productId = params.product;
     
     if (!productId) {
-        router.navigate('/');
+        router.navigate('index.html');
         return '';
     }
     
@@ -216,8 +219,8 @@ function updateBreadcrumb(categoryName, productName) {
     if (!breadcrumb) return;
     
     breadcrumb.innerHTML = `
-        <a href="/">Home</a>
-        ${categoryName ? `<span class="separator"> > </span><a href="/?category=${sanitize.attribute(getCategoryId(categoryName))}">${sanitize.html(categoryName)}</a>` : ''}
+        <a href="index.html">Home</a>
+        ${categoryName ? `<span class="separator"> > </span><a href="index.html?category=${sanitize.attribute(getCategoryId(categoryName))}">${sanitize.html(categoryName)}</a>` : ''}
         ${productName ? `<span class="separator"> > </span><span>${sanitize.html(productName)}</span>` : ''}
     `;
 }

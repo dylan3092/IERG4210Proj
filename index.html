@@ -23,9 +23,9 @@
       <div class="user-info">
         Welcome, <span id="user-display">Guest</span>
         <div class="user-actions">
-          <a href="/login.html" id="login-link">Login</a>
+          <a href="login.html" id="login-link">Login</a>
           <a href="#" id="logout-link" style="display: none;">Logout</a>
-          <a href="/admin.html" id="admin-link" style="display: none;">Admin Panel</a>
+          <a href="admin.html" id="admin-link" style="display: none;">Admin Panel</a>
         </div>
       </div>
     </div>
@@ -69,7 +69,7 @@
 
   <!-- Add these scripts right before closing body tag -->
   <script>
-    const BASE_URL = 'http://s15.ierg4210.ie.cuhk.edu.hk:3000';
+    const BASE_URL = '';
     
     // Check if user is logged in
     document.addEventListener('DOMContentLoaded', () => {
@@ -121,14 +121,14 @@
     });
   </script>
   <!-- Load sanitization utilities first -->
-  <script src="public/js/sanitize.js"></script>
+  <script src="js/sanitize.js"></script>
   <!-- Load shop validation -->
-  <script src="public/js/shop-validation.js"></script>
+  <script src="js/shop-validation.js"></script>
   <!-- Load router -->
-  <script src="public/router.js"></script>
+  <script src="router.js"></script>
   <!-- Load cart -->
-  <script src="public/cart.js"></script>
+  <script src="cart.js"></script>
   <!-- Finally load main.js which depends on both -->
-  <script src="public/main.js"></script>
+  <script src="main.js"></script>
 </body>
 </html>

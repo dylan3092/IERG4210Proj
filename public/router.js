@@ -90,13 +90,18 @@ class Router {
         let handler = null;
         let params = {};
         
+        // Normalize path by removing leading slash
+        const normalizedPath = path.startsWith('/') ? path.substring(1) : path;
+        
         // Check for exact match first
-        if (this.routes[path]) {
-            handler = this.routes[path];
+        if (this.routes[normalizedPath]) {
+            handler = this.routes[normalizedPath];
+        } else if (this.routes['/'+normalizedPath]) {
+            handler = this.routes['/'+normalizedPath];
         } else {
             // Check for pattern matches (e.g., /product/:id)
             for (const [pattern, routeHandler] of Object.entries(this.routes)) {
-                const match = this.matchRoute(pattern, path);
+                const match = this.matchRoute(pattern, normalizedPath);
                 if (match) {
                     handler = routeHandler;
                     params = match;
