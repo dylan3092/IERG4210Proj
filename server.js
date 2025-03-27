@@ -1431,8 +1431,9 @@ const server = app.listen(httpPort, () => {
 // Check if SSL certificates exist before trying to create HTTPS server
 try {
     // Check if certificate files exist
-    const certPath = '/etc/letsencrypt/live/s15.ierg4210.ie.cuhk.edu.hk/fullchain.pem';
-    const keyPath = '/etc/letsencrypt/live/s15.ierg4210.ie.cuhk.edu.hk/privkey.pem';
+    const homeDir = process.env.HOME || '/home/ec2-user';
+    const certPath = `${homeDir}/certificates/fullchain.pem`;
+    const keyPath = `${homeDir}/certificates/privkey.pem`;
     
     if (!fs.existsSync(certPath) || !fs.existsSync(keyPath)) {
         throw new Error(`Certificate files not found at ${certPath} or ${keyPath}`);
