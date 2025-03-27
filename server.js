@@ -1429,6 +1429,8 @@ const server = app.listen(httpPort, () => {
 });
 
 // Check if SSL certificates exist before trying to create HTTPS server
+// This section can be commented out if you're using Apache with SSL
+/*
 try {
     // Check if certificate files exist
     const homeDir = process.env.HOME || '/home/ec2-user';
@@ -1459,4 +1461,9 @@ try {
     console.log('SSL certificates not found or permission issue. Running in HTTP mode only.');
     console.log('To enable HTTPS, install Let\'s Encrypt certificates and restart the server.');
     console.log('Error details:', error.message);
-} 
+}
+*/
+
+// Notify that we're relying on Apache for SSL
+console.log('Running in HTTP mode only. SSL/HTTPS is managed by Apache.');
+console.log('The server is listening on port 3000 for proxied connections.'); 
