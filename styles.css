@@ -559,3 +559,40 @@ button[type="submit"]:disabled {
         opacity: 0;
     }
 }
+
+/* Top bar and user info styles */
+.top-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    padding: 0 15px;
+}
+
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+}
+
+.user-actions {
+    display: flex;
+    gap: 15px;
+    margin-left: 10px;
+}
+
+.user-actions a {
+    color: #007bff;
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.user-actions a:hover {
+    color: #0056b3;
+    text-decoration: underline;
+}
+
+#user-display {
+    font-weight: bold;
+}

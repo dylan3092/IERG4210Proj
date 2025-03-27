@@ -9,9 +9,21 @@
 </head>
 <body>
   <header>
-    <nav class="breadcrumb">
-      <!-- Will be populated by JavaScript -->
-    </nav>
+    <div class="top-bar">
+      <nav class="breadcrumb">
+        <!-- Will be populated by JavaScript -->
+      </nav>
+      
+      <!-- User information -->
+      <div class="user-info">
+        Welcome, <span id="user-display">Guest</span>
+        <div class="user-actions">
+          <a href="/login.html" id="login-link">Login</a>
+          <a href="#" id="logout-link" style="display: none;">Logout</a>
+          <a href="/admin.html" id="admin-link" style="display: none;">Admin Panel</a>
+        </div>
+      </div>
+    </div>
   </header>
 
   <!-- Shopping cart section -->
@@ -49,6 +61,55 @@
   <script>
     // Define the base URL with port 3000
     const BASE_URL = 'http://s15.ierg4210.ie.cuhk.edu.hk:3000';
+    
+    // Check if user is logged in
+    document.addEventListener('DOMContentLoaded', () => {
+      const userEmail = sessionStorage.getItem('userEmail');
+      const isAdmin = sessionStorage.getItem('isAdmin');
+      const userDisplay = document.getElementById('user-display');
+      const loginLink = document.getElementById('login-link');
+      const logoutLink = document.getElementById('logout-link');
+      const adminLink = document.getElementById('admin-link');
+      
+      if (userEmail) {
+        // User is logged in
+        userDisplay.textContent = userEmail;
+        loginLink.style.display = 'none';
+        logoutLink.style.display = 'inline';
+        
+        // Show admin link if user is admin
+        if (isAdmin === 'true') {
+          adminLink.style.display = 'inline';
+        }
+        
+        // Setup logout functionality
+        logoutLink.addEventListener('click', async (e) => {
+          e.preventDefault();
+          
+          try {
+            const response = await fetch('/api/logout', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'CSRF-Token': sessionStorage.getItem('csrfToken')
+              }
+            });
+            
+            if (response.ok) {
+              // Clear session storage
+              sessionStorage.removeItem('userEmail');
+              sessionStorage.removeItem('isAdmin');
+              sessionStorage.removeItem('csrfToken');
+              
+              // Refresh the page
+              window.location.reload();
+            }
+          } catch (error) {
+            console.error('Logout error:', error);
+          }
+        });
+      }
+    });
   </script>
   <!-- Load sanitization utilities first -->
   <script src="http://s15.ierg4210.ie.cuhk.edu.hk:3000/js/sanitize.js"></script>
