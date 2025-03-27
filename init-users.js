@@ -63,7 +63,7 @@ async function addUser(connection, user) {
         
         // Insert the new user
         const [result] = await connection.query(
-            'INSERT INTO users (email, password, admin) VALUES (?, ?, ?)',
+            'INSERT INTO users (email, password, is_admin) VALUES (?, ?, ?)',
             [user.email, hashedPassword, user.admin]
         );
         

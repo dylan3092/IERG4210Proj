@@ -48,7 +48,7 @@ const authUtils = {
                     userid INT AUTO_INCREMENT PRIMARY KEY,
                     email VARCHAR(255) NOT NULL UNIQUE,
                     password VARCHAR(255) NOT NULL,
-                    admin BOOLEAN DEFAULT FALSE,
+                    is_admin BOOLEAN DEFAULT FALSE,
                     createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
                 )
@@ -79,10 +79,13 @@ const authUtils = {
                 
                 if (existingUsers.length === 0) {
                     const hashedPassword = await authUtils.hashPassword(user.password);
+                    
+                    // Use is_admin column name instead of admin
                     await pool.query(
-                        'INSERT INTO users (email, password, admin) VALUES (?, ?, ?)',
+                        'INSERT INTO users (email, password, is_admin) VALUES (?, ?, ?)',
                         [user.email, hashedPassword, user.admin]
                     );
+                    
                     console.log(`User ${user.email} added`);
                 } else {
                     console.log(`User ${user.email} already exists`);
@@ -100,7 +103,7 @@ const authUtils = {
     
     // Check if a user is an admin
     isAdmin(req) {
-        return req.session && req.session.isAdmin === true;
+        return req.session && req.session.is_admin === true;
     },
     
     // Authentication middleware
@@ -787,13 +790,13 @@ app.post('/api/login', async (req, res) => {
         // Store user data in session for use in the client
         req.session.userId = user.userid;
         req.session.userEmail = user.email;
-        req.session.isAdmin = user.is_admin === 1;
+        req.session.is_admin = user.is_admin === 1 || user.is_admin === true;
         
         return res.status(200).json({ 
             success: true,
             user: {
                 email: user.email,
-                isAdmin: user.is_admin === 1
+                isAdmin: req.session.is_admin
             }
         });
     } catch (error) {
