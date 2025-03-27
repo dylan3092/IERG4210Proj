@@ -2,8 +2,53 @@
 const API = {
     categories: `${BASE_URL}/api/categories`,
     products: `${BASE_URL}/api/products`,
-    csrfToken: `${BASE_URL}/api/csrf-token` // New endpoint for CSRF token
+    csrfToken: `${BASE_URL}/api/csrf-token`, // New endpoint for CSRF token
+    authStatus: `${BASE_URL}/api/auth/status` // New endpoint to check authentication status
 };
+
+// Authentication check - run immediately before anything else
+(async function validateAdminAccess() {
+    try {
+        console.log('Validating admin authentication...');
+        const response = await fetch(API.authStatus, { 
+            credentials: 'include' 
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to validate authentication');
+        }
+        
+        const authData = await response.json();
+        console.log('Auth status:', authData);
+        
+        // If not authenticated or not admin, redirect to login
+        if (!authData.authenticated || !authData.user.isAdmin) {
+            console.warn('Unauthorized access attempt to admin panel');
+            window.location.href = '/login.html';
+            // Stop script execution by throwing error
+            throw new Error('Unauthorized access');
+        }
+        
+        console.log('Admin authentication valid, session expires in', 
+            Math.floor(authData.session.expiresIn / (1000 * 60 * 60)), 'hours');
+            
+        // Store user information in session storage
+        sessionStorage.setItem('userEmail', authData.user.email);
+        sessionStorage.setItem('isAdmin', authData.user.isAdmin);
+            
+        // Remove loader and reveal admin UI now that we've confirmed admin status
+        const authLoader = document.getElementById('auth-loader');
+        if (authLoader) {
+            authLoader.style.display = 'none';
+        }
+        document.querySelector('body').style.visibility = 'visible';
+    } catch (error) {
+        console.error('Authentication validation error:', error);
+        // Hide page content and redirect
+        document.body.innerHTML = '<p>Redirecting to login page...</p>';
+        setTimeout(() => window.location.href = '/login.html', 1000);
+    }
+})();
 
 // CSRF token management
 let csrfToken = '';
@@ -34,22 +79,53 @@ const applyCsrf = (config = {}) => {
     return newConfig;
 };
 
-// Enhanced fetch function with CSRF protection
+// Enhanced fetch function with CSRF protection and authentication handling
 const safeFetch = async (url, options = {}) => {
-    // Apply CSRF token to the request
-    const configWithCsrf = applyCsrf(options);
-    
-    // Make the request
-    const response = await fetch(url, configWithCsrf);
-    
-    // If token is expired or invalid, try to refresh it and retry once
-    if (response.status === 403 && response.statusText.includes('CSRF')) {
-        await fetchCsrfToken();
-        configWithCsrf.headers['X-CSRF-Token'] = csrfToken;
-        return fetch(url, configWithCsrf);
+    try {
+        // Apply CSRF token to the request
+        const configWithCsrf = applyCsrf(options);
+        
+        // Make the request
+        const response = await fetch(url, configWithCsrf);
+        
+        // Handle authentication errors
+        if (response.status === 401) {
+            console.error('Authentication required. Redirecting to login page.');
+            window.location.href = '/login.html?error=session_expired&redirect=/admin';
+            throw new Error('Authentication required');
+        }
+        
+        // Handle authorization errors (not admin)
+        if (response.status === 403) {
+            console.error('Admin privileges required. Redirecting to home page.');
+            window.location.href = '/?error=not_authorized';
+            throw new Error('Admin privileges required');
+        }
+        
+        // If token is expired or invalid, try to refresh it and retry once
+        if (response.status === 403 && response.statusText.includes('CSRF')) {
+            await fetchCsrfToken();
+            configWithCsrf.headers['X-CSRF-Token'] = csrfToken;
+            return fetch(url, configWithCsrf);
+        }
+        
+        return response;
+    } catch (error) {
+        // Handle network errors
+        console.error('Network error during fetch:', error);
+        
+        // If session storage has user info but we're getting errors, 
+        // it might be a session issue - clear and redirect
+        if (sessionStorage.getItem('userEmail')) {
+            console.error('Session may have expired. Redirecting to login page.');
+            sessionStorage.removeItem('userEmail');
+            sessionStorage.removeItem('isAdmin');
+            sessionStorage.removeItem('csrfToken');
+            window.location.href = '/login.html?error=session_expired&redirect=/admin';
+        }
+        
+        throw error;
     }
-    
-    return response;
 };
 
 // Utility functions

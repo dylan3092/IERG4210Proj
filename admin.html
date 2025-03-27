@@ -6,8 +6,53 @@
     <title>Admin Panel</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
+    <style>
+        /* Initial state: hide content until auth is validated */
+        body {
+            visibility: hidden;
+        }
+        
+        /* Loader style for auth check */
+        .auth-loader {
+            visibility: visible;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+        
+        .auth-loader .spinner {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Other existing styles... */
+    </style>
 </head>
 <body>
+    <!-- Auth loader shown while validating -->
+    <div class="auth-loader" id="auth-loader">
+        <div class="spinner"></div>
+        <p>Validating authentication...</p>
+    </div>
+
     <header class="bg-dark text-white p-3">
         <div class="container d-flex justify-content-between align-items-center">
             <h1>Admin Panel</h1>

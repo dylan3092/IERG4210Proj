@@ -106,29 +106,94 @@ const authUtils = {
         return authUtils.isAuthenticated(req) && req.session.is_admin === true;
     },
     
-    // Authentication middleware
-    authenticate(req, res, next) {
+    // Authentication middleware with enhanced security and logging
+    authenticate: (req, res, next) => {
         if (authUtils.isAuthenticated(req)) {
+            // Log authentication success
+            const ipAddress = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+            console.log(`[AUTH SUCCESS] User ${req.session.userEmail} authenticated from ${ipAddress}`);
             next();
         } else {
-            // Redirect to login page for HTML requests
-            if (req.accepts('html')) {
-                return res.redirect('/login.html');
+            // Log authentication failure
+            const ipAddress = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+            console.log(`[AUTH FAILURE] Unauthenticated access attempt from ${ipAddress} to ${req.method} ${req.originalUrl}`);
+            
+            // Clear any existing invalid sessions
+            if (req.session) {
+                req.session.destroy((err) => {
+                    if (err) {
+                        console.error('Error destroying invalid session:', err);
+                    }
+                    // Clear the session cookie
+                    res.clearCookie('neon_session');
+                    
+                    // Redirect to login page for HTML requests
+                    if (req.accepts('html')) {
+                        return res.redirect('/login.html');
+                    }
+                    
+                    // Return JSON error for API requests
+                    res.status(401).json({ 
+                        error: 'Authentication required',
+                        message: 'You must be logged in to access this resource',
+                        code: 'AUTH_REQUIRED'
+                    });
+                });
+            } else {
+                // Redirect to login page for HTML requests
+                if (req.accepts('html')) {
+                    return res.redirect('/login.html');
+                }
+                
+                // Return JSON error for API requests
+                res.status(401).json({ 
+                    error: 'Authentication required',
+                    message: 'You must be logged in to access this resource',
+                    code: 'AUTH_REQUIRED'
+                });
             }
-            res.status(401).json({ error: 'Authentication required' });
         }
     },
     
-    // Admin authorization middleware
-    authorizeAdmin(req, res, next) {
+    // Admin authorization middleware with enhanced security and logging
+    authorizeAdmin: (req, res, next) => {
         if (authUtils.isAuthenticated(req) && authUtils.isAdmin(req)) {
+            // Log admin authorization success
+            const ipAddress = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+            console.log(`[ADMIN AUTH SUCCESS] Admin ${req.session.userEmail} authorized from ${ipAddress} for ${req.method} ${req.originalUrl}`);
             next();
+        } else if (authUtils.isAuthenticated(req)) {
+            // Log non-admin access attempt to admin resource
+            const ipAddress = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+            console.log(`[ADMIN AUTH FAILURE] Non-admin user ${req.session.userEmail} attempted to access admin resource from ${ipAddress}: ${req.method} ${req.originalUrl}`);
+            
+            // Redirect to home page for HTML requests
+            if (req.accepts('html')) {
+                return res.redirect('/?error=not_authorized');
+            }
+            
+            // Return JSON error for API requests
+            res.status(403).json({ 
+                error: 'Authorization required',
+                message: 'Admin privileges required to access this resource',
+                code: 'ADMIN_REQUIRED'
+            });
         } else {
+            // Log unauthenticated access attempt to admin resource
+            const ipAddress = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+            console.log(`[ADMIN AUTH FAILURE] Unauthenticated access attempt to admin resource from ${ipAddress}: ${req.method} ${req.originalUrl}`);
+            
             // Redirect to login page for HTML requests
             if (req.accepts('html')) {
-                return res.redirect('/login.html');
+                return res.redirect('/login.html?error=auth_required&redirect=' + encodeURIComponent(req.originalUrl));
             }
-            res.status(403).json({ error: 'Admin privileges required' });
+            
+            // Return JSON error for API requests
+            res.status(401).json({ 
+                error: 'Authentication required',
+                message: 'You must be logged in as an admin to access this resource',
+                code: 'AUTH_REQUIRED'
+            });
         }
     }
 };
@@ -630,7 +695,9 @@ app.get('/api/categories/:id', async (req, res) => {
     }
 });
 
-app.post('/api/categories', async (req, res) => {
+// Admin-only API routes - protected with admin authorization
+// Create category (admin only)
+app.post('/api/categories', authUtils.authorizeAdmin, async (req, res) => {
     try {
         console.log('Received category data:', req.body); // Debug log
         
@@ -653,7 +720,8 @@ app.post('/api/categories', async (req, res) => {
     }
 });
 
-app.put('/api/categories/:id', async (req, res) => {
+// Update category (admin only)
+app.put('/api/categories/:id', authUtils.authorizeAdmin, async (req, res) => {
     try {
         const { name } = req.body;
         await pool.query('UPDATE categories SET name = ? WHERE catid = ?', [name, req.params.id]);
@@ -663,7 +731,8 @@ app.put('/api/categories/:id', async (req, res) => {
     }
 });
 
-app.delete('/api/categories/:id', async (req, res) => {
+// Delete category (admin only)
+app.delete('/api/categories/:id', authUtils.authorizeAdmin, async (req, res) => {
     try {
         await pool.query('DELETE FROM categories WHERE catid = ?', [req.params.id]);
         res.json({ message: 'Category deleted successfully' });
@@ -754,7 +823,8 @@ async function processImage(originalPath, filename) {
     };
 }
 
-app.post('/api/products', upload.single('image'), async (req, res) => {
+// Create product (admin only)
+app.post('/api/products', authUtils.authorizeAdmin, upload.single('image'), async (req, res) => {
     try {
         console.log('Received product data:', req.body);
         console.log('Received file:', req.file);
@@ -796,7 +866,8 @@ app.post('/api/products', upload.single('image'), async (req, res) => {
     }
 });
 
-app.put('/api/products/:id', upload.single('image'), async (req, res) => {
+// Update product (admin only)
+app.put('/api/products/:id', authUtils.authorizeAdmin, upload.single('image'), async (req, res) => {
     try {
         const { catid, name, price, description } = req.body;
         let imageFiles = null;
@@ -847,7 +918,8 @@ app.put('/api/products/:id', upload.single('image'), async (req, res) => {
     }
 });
 
-app.delete('/api/products/:id', async (req, res) => {
+// Delete product (admin only)
+app.delete('/api/products/:id', authUtils.authorizeAdmin, async (req, res) => {
     try {
         // Delete associated image
         const [oldProduct] = await pool.query('SELECT image FROM products WHERE pid = ?', [req.params.id]);
