@@ -45,6 +45,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 // Load categories once and cache them
 async function loadCategories() {
     try {
+        console.log(`Attempting to fetch categories from: ${BASE_URL}/categories`);
         const response = await fetch(`${BASE_URL}/categories`);
         
         if (!response.ok) {
@@ -61,7 +62,11 @@ async function loadCategories() {
                 });
             } else {
                 categoryLists.forEach(list => {
-                    list.innerHTML = '<li class="error">Error loading categories</li>';
+                    list.innerHTML = `
+                        <li class="error">Error loading categories: ${response.status} ${response.statusText}</li>
+                        <li class="error">API might not be running correctly</li>
+                        <li><a href="login.html">Try Login</a></li>
+                    `;
                 });
             }
             
@@ -78,7 +83,12 @@ async function loadCategories() {
         console.error('Error fetching categories:', error);
         const categoryLists = document.querySelectorAll('aside ul');
         categoryLists.forEach(list => {
-            list.innerHTML = '<li class="error">Error loading categories</li>';
+            list.innerHTML = `
+                <li class="error">Error connecting to API server</li>
+                <li class="error">Details: ${error.message}</li>
+                <li class="error">Make sure your server is running</li>
+                <li><a href="login.html">Try Login</a></li>
+            `;
         });
         return [];
     }
@@ -156,7 +166,24 @@ async function homeHandler(params) {
                 `;
             }
             
-            return `<p class="error">Error loading products. Server returned: ${response.status} ${response.statusText}</p>`;
+            return `
+                <div class="api-error">
+                    <h2>Error Loading Products: ${response.status} ${response.statusText}</h2>
+                    <p>The API server is not responding correctly. This could be due to several reasons:</p>
+                    
+                    <h3>Server Setup Checklist:</h3>
+                    <ul>
+                        <li>Make sure the Node.js server is running on the server</li>
+                        <li>Verify the database is properly set up with the required tables</li>
+                        <li>Check that all npm dependencies are installed on the server</li>
+                        <li>Confirm the API routes in server.js are correctly defined</li>
+                        <li>Ensure the server is properly configured to handle requests to /api/products</li>
+                    </ul>
+                    
+                    <p>You can try logging in (if that's an option) or contact the administrator:</p>
+                    <p><a href="login.html">Go to Login Page</a></p>
+                </div>
+            `;
         }
         
         const products = await response.json();
@@ -261,7 +288,14 @@ async function productHandler(params) {
         
     } catch (error) {
         console.error('Error:', error);
-        return '<p class="error">Product not found</p>';
+        return `
+            <div class="api-error">
+                <h2>Error Loading Product</h2>
+                <p>An error occurred: ${error.message}</p>
+                <p>This could be due to server connectivity issues or API configuration problems.</p>
+                <p><a href="index.html">Return to Home Page</a></p>
+            </div>
+        `;
     }
 }
 

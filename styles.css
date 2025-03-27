@@ -596,3 +596,47 @@ button[type="submit"]:disabled {
 #user-display {
     font-weight: bold;
 }
+
+/* API Error Styling */
+.api-error {
+  background-color: #fff8f8;
+  border: 1px solid #ffdddd;
+  border-radius: 5px;
+  padding: 20px;
+  margin: 20px 0;
+  box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+}
+
+.api-error h2 {
+  color: #d32f2f;
+  margin-top: 0;
+}
+
+.api-error h3 {
+  margin-top: 20px;
+  color: #333;
+}
+
+.api-error ul {
+  padding-left: 20px;
+}
+
+.api-error li {
+  margin-bottom: 8px;
+  color: #555;
+}
+
+.api-error a {
+  display: inline-block;
+  background-color: #2196f3;
+  color: white;
+  padding: 8px 16px;
+  text-decoration: none;
+  border-radius: 4px;
+  font-weight: bold;
+  margin-top: 10px;
+}
+
+.api-error a:hover {
+  background-color: #0b7dda;
+}
