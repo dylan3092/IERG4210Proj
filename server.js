@@ -5,6 +5,7 @@ const path = require('path');
 const fs = require('fs/promises');
 const sharp = require('sharp');
 const xss = require('xss');
+const crypto = require('crypto');
 
 const app = express();
 
@@ -105,6 +106,53 @@ app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');  // Or specific domain
     res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE');
     res.header('Access-Control-Allow-Headers', 'Content-Type');
+    
+    // Generate a random nonce for this request
+    const nonce = crypto.randomBytes(16).toString('base64');
+    
+    // Add Content Security Policy header
+    // This is a strict policy that helps prevent XSS attacks
+    const cspDirectives = [
+        // Default fallback - deny by default
+        "default-src 'self'",
+        // Scripts can be loaded from same origin and allow our external CDN
+        // Also allow inline scripts with the generated nonce and unsafe-inline as a fallback
+        `script-src 'self' http://s15.ierg4210.ie.cuhk.edu.hk:3000 'nonce-${nonce}' 'unsafe-eval' 'unsafe-inline'`,
+        // Styles can be loaded from same origin and allow our external CDN and inline styles
+        "style-src 'self' http://s15.ierg4210.ie.cuhk.edu.hk:3000 'unsafe-inline'",
+        // Images can be loaded from same origin and data URIs
+        "img-src 'self' data: http://s15.ierg4210.ie.cuhk.edu.hk:3000",
+        // Forms can only submit to same origin
+        "form-action 'self'",
+        // Frames can only load from same origin
+        "frame-src 'self'",
+        // Connect to only same origin
+        "connect-src 'self' http://s15.ierg4210.ie.cuhk.edu.hk:3000",
+        // Font sources
+        "font-src 'self' http://s15.ierg4210.ie.cuhk.edu.hk:3000",
+        // Media sources
+        "media-src 'self'",
+        // Object sources (plugins, etc)
+        "object-src 'none'",
+        // Base URI restriction to prevent base tag hijacking
+        "base-uri 'self'",
+        // Upgrade insecure requests
+        "upgrade-insecure-requests",
+        // Report violations to this endpoint
+        "report-to csp-endpoint"
+    ];
+    
+    // Set CSP header - use report-only first to test before enforcing
+    // Comment this line and uncomment the next one when you're ready to enforce
+    res.header('Content-Security-Policy-Report-Only', cspDirectives.join('; '));
+    // res.header('Content-Security-Policy', cspDirectives.join('; '));
+    
+    // Set up CSP reporting
+    res.header('Reporting-Endpoints', 'csp-endpoint="/api/csp-report"');
+    
+    // Make nonce available to templates if needed
+    res.locals.cspNonce = nonce;
+    
     next();
 });
 
@@ -395,6 +443,18 @@ app.get('/api/categories/:catid/products', async (req, res) => {
         console.error('Error fetching category products:', error);
         res.status(500).json({ error: error.message });
     }
+});
+
+// Add a route to handle CSP violation reports
+app.post('/api/csp-report', express.json({ type: 'application/csp-report' }), (req, res) => {
+    console.log('CSP Violation:', req.body);
+    res.status(204).end();
+});
+
+// Also add a route for standard Reporting API reports
+app.post('/api/csp-report', express.json({ type: 'application/reports+json' }), (req, res) => {
+    console.log('CSP Violation (Reporting API):', req.body);
+    res.status(204).end();
 });
 
 // Error handling middleware
