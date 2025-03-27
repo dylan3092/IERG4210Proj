@@ -181,7 +181,7 @@ async function homeHandler(params) {
                     </ul>
                     
                     <p>You can try logging in (if that's an option) or contact the administrator:</p>
-                    <p><a href="login.html">Go to Login Page</a></p>
+                    <p><a href="login.html" target="_self" class="btn">Go to Login</a></p>
                 </div>
             `;
         }
@@ -293,7 +293,7 @@ async function productHandler(params) {
                 <h2>Error Loading Product</h2>
                 <p>An error occurred: ${error.message}</p>
                 <p>This could be due to server connectivity issues or API configuration problems.</p>
-                <p><a href="index.html">Return to Home Page</a></p>
+                <p><a href="index.html" target="_self">Return to Home Page</a></p>
             </div>
         `;
     }
@@ -358,4 +358,9 @@ function initializePageStructure(path) {
         // Re-render categories
         renderCategories();
     }
+}
+
+// Add to cart
+function addToCart(productId, quantity) {
+    // Implementation of addToCart function
 }

@@ -68,7 +68,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-    const BASE_URL = '/api';
+    const BASE_URL = 'http://s15.ierg4210.ie.cuhk.edu.hk:3000/api';
     
     document.addEventListener('DOMContentLoaded', () => {
         const loginForm = document.getElementById('login-form');
@@ -99,8 +99,17 @@
                         headers: {
                             'Content-Type': 'application/json'
                         },
-                        body: JSON.stringify({ email, password })
+                        body: JSON.stringify({ email, password }),
+                        credentials: 'include'
                     });
+                    
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        console.error('Login failed:', response.status, errorText);
+                        errorMessage.textContent = 'Login failed: ' + (response.status === 404 ? 'API not found' : errorText || response.statusText);
+                        errorMessage.style.display = 'block';
+                        return;
+                    }
                     
                     const data = await response.json();
                     
