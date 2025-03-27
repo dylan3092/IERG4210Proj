@@ -1084,56 +1084,72 @@ app.post('/api/logout', async (req, res) => {
     }
 });
 
-// Change password endpoint
-app.post('/api/change-password', async (req, res) => {
+// Change password endpoint (requires authentication)
+app.post('/api/change-password', authUtils.authenticate, async (req, res) => {
     try {
-        const sessionId = req.cookies.sessionId;
-        if (!sessionId) {
-            return res.status(401).json({ error: 'Not authenticated' });
-        }
-        
-        const db = await getDB();
-        const session = await db.get('SELECT * FROM sessions WHERE session_id = ?', [sessionId]);
-        
-        if (!session) {
-            return res.status(401).json({ error: 'Invalid session' });
-        }
-        
-        // Check if session is expired
-        const now = new Date().getTime();
-        if (now > session.expires_at) {
-            await db.run('DELETE FROM sessions WHERE session_id = ?', [sessionId]);
-            return res.status(401).json({ error: 'Session expired' });
-        }
-        
         const { currentPassword, newPassword } = req.body;
         if (!currentPassword || !newPassword) {
             return res.status(400).json({ error: 'Current password and new password are required' });
         }
-        
+
         // Get user from database
-        const user = await db.get('SELECT * FROM users WHERE userid = ?', [session.user_id]);
-        if (!user) {
+        const [users] = await pool.query('SELECT * FROM users WHERE userid = ?', [req.session.userId]);
+        if (users.length === 0) {
             return res.status(404).json({ error: 'User not found' });
         }
+        const user = users[0];
         
         // Verify current password
-        const match = await bcrypt.compare(currentPassword, user.password);
-        if (!match) {
+        const passwordMatch = await bcrypt.compare(currentPassword, user.password);
+        if (!passwordMatch) {
+            console.log('Password change attempt with incorrect current password for user:', user.email);
             return res.status(401).json({ error: 'Current password is incorrect' });
         }
         
+        // Validate new password - Add your password policy here
+        if (newPassword.length < 8) {
+            return res.status(400).json({ error: 'New password must be at least 8 characters long' });
+        }
+        
         // Hash new password
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(newPassword, salt);
+        const hashedPassword = await authUtils.hashPassword(newPassword);
         
         // Update password in database
-        await db.run('UPDATE users SET password = ? WHERE userid = ?', [hashedPassword, user.userid]);
+        await pool.query('UPDATE users SET password = ? WHERE userid = ?', [hashedPassword, user.userid]);
         
-        return res.status(200).json({ success: true });
+        console.log('Password changed successfully for user:', user.email);
+        
+        // Log action for security audit
+        const ipAddress = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+        console.log(`[PASSWORD CHANGE] User ${user.email} changed password from ${ipAddress}`);
+        
+        // Log out the user by destroying the session
+        req.session.destroy((err) => {
+            if (err) {
+                console.error('Error destroying session after password change:', err);
+                return res.status(500).json({ 
+                    success: true, 
+                    message: 'Password changed successfully, but session could not be cleared. Please log out manually.' 
+                });
+            }
+            
+            // Clear the session cookie
+            res.clearCookie('neon_session', {
+                path: '/',
+                httpOnly: true,
+                secure: true,
+                sameSite: 'strict'
+            });
+            
+            // Return success response
+            res.status(200).json({ 
+                success: true, 
+                message: 'Password changed successfully. Please log in with your new password.' 
+            });
+        });
     } catch (error) {
-        console.error('Change password error:', error);
-        return res.status(500).json({ error: 'Internal server error' });
+        console.error('Password change error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 });
 

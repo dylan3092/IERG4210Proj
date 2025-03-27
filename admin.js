@@ -377,8 +377,8 @@ const handleLogout = async () => {
             sessionStorage.removeItem('isAdmin');
             sessionStorage.removeItem('csrfToken');
             
-            // Redirect to login page
-            window.location.href = '/login.html';
+            // Redirect to login page with success message
+            window.location.href = '/login.html?message=logout_success';
         } else {
             const errorText = await response.text();
             console.error('Logout failed:', errorText);

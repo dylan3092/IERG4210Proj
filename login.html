@@ -80,10 +80,12 @@
         const urlParams = new URLSearchParams(window.location.search);
         const error = urlParams.get('error');
         const redirect = urlParams.get('redirect');
+        const message = urlParams.get('message');
         
         // Display appropriate error message based on URL parameter
         if (error) {
             errorMessage.style.display = 'block';
+            errorMessage.className = 'alert alert-danger';
             
             switch (error) {
                 case 'auth_required':
@@ -97,6 +99,22 @@
                     break;
                 default:
                     errorMessage.textContent = 'An error occurred. Please log in to continue.';
+            }
+        } else if (message) {
+            errorMessage.style.display = 'block';
+            
+            switch (message) {
+                case 'password_changed':
+                    errorMessage.className = 'alert alert-success';
+                    errorMessage.textContent = 'Your password has been changed successfully. Please log in with your new password.';
+                    break;
+                case 'logout_success':
+                    errorMessage.className = 'alert alert-success';
+                    errorMessage.textContent = 'You have been logged out successfully.';
+                    break;
+                default:
+                    errorMessage.className = 'alert alert-info';
+                    errorMessage.textContent = message;
             }
         }
         

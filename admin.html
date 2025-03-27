@@ -206,6 +206,13 @@
                 successMessage.textContent = '';
                 successMessage.style.display = 'none';
                 
+                // Validate password
+                if (newPassword.length < 8) {
+                    errorMessage.textContent = 'New password must be at least 8 characters long';
+                    errorMessage.style.display = 'block';
+                    return;
+                }
+                
                 // Check if passwords match
                 if (newPassword !== confirmPassword) {
                     errorMessage.textContent = 'New passwords do not match';
@@ -214,6 +221,17 @@
                 }
                 
                 try {
+                    // Disable form controls while request is in progress
+                    const submitButton = passwordChangeForm.querySelector('button[type="submit"]');
+                    submitButton.disabled = true;
+                    document.getElementById('current-password').disabled = true;
+                    document.getElementById('new-password').disabled = true;
+                    document.getElementById('confirm-password').disabled = true;
+                    
+                    // Show loading message
+                    successMessage.textContent = 'Changing password...';
+                    successMessage.style.display = 'block';
+                    
                     const csrfToken = sessionStorage.getItem('csrfToken');
                     const response = await fetch(`${BASE_URL}/api/change-password`, {
                         method: 'POST',
@@ -221,36 +239,50 @@
                             'Content-Type': 'application/json',
                             'CSRF-Token': csrfToken
                         },
-                        body: JSON.stringify({ currentPassword, newPassword })
+                        body: JSON.stringify({ currentPassword, newPassword }),
+                        credentials: 'include'
                     });
                     
                     const data = await response.json();
                     
                     if (response.ok) {
                         // Show success message
-                        successMessage.textContent = 'Password changed successfully';
+                        successMessage.textContent = data.message || 'Password changed successfully! You will be redirected to the login page.';
                         successMessage.style.display = 'block';
                         
-                        // Clear form fields
-                        document.getElementById('current-password').value = '';
-                        document.getElementById('new-password').value = '';
-                        document.getElementById('confirm-password').value = '';
+                        // Clean up any stored credentials
+                        sessionStorage.removeItem('userEmail');
+                        sessionStorage.removeItem('isAdmin');
+                        sessionStorage.removeItem('csrfToken');
                         
-                        // Close modal after delay
+                        // Redirect to login page after a delay
                         setTimeout(() => {
-                            const modal = new bootstrap.Modal(document.getElementById('passwordChangeModal'));
-                            modal.hide();
-                            successMessage.style.display = 'none';
-                        }, 2000);
+                            window.location.href = '/login.html?message=password_changed';
+                        }, 3000);
                     } else {
+                        // Re-enable form
+                        submitButton.disabled = false;
+                        document.getElementById('current-password').disabled = false;
+                        document.getElementById('new-password').disabled = false;
+                        document.getElementById('confirm-password').disabled = false;
+                        
                         // Show error message
                         errorMessage.textContent = data.error || 'Failed to change password. Please try again.';
                         errorMessage.style.display = 'block';
+                        successMessage.style.display = 'none';
                     }
                 } catch (error) {
+                    // Re-enable form
+                    const submitButton = passwordChangeForm.querySelector('button[type="submit"]');
+                    submitButton.disabled = false;
+                    document.getElementById('current-password').disabled = false;
+                    document.getElementById('new-password').disabled = false;
+                    document.getElementById('confirm-password').disabled = false;
+                    
                     console.error('Password change error:', error);
                     errorMessage.textContent = 'An error occurred. Please try again.';
                     errorMessage.style.display = 'block';
+                    successMessage.style.display = 'none';
                 }
             });
         }
