@@ -8,8 +8,119 @@ const xss = require('xss');
 const crypto = require('crypto');
 const cookieParser = require('cookie-parser');
 const session = require('express-session');
+const bcrypt = require('bcrypt'); // For password hashing
 
 const app = express();
+
+// Number of salt rounds for bcrypt
+const SALT_ROUNDS = 12;
+
+// Authentication utility functions
+const authUtils = {
+    // Hash a password with bcrypt
+    async hashPassword(password) {
+        try {
+            const salt = await bcrypt.genSalt(SALT_ROUNDS);
+            const hash = await bcrypt.hash(password, salt);
+            return hash;
+        } catch (error) {
+            console.error('Error hashing password:', error);
+            throw error;
+        }
+    },
+    
+    // Verify a password against a hash
+    async verifyPassword(password, hash) {
+        try {
+            return await bcrypt.compare(password, hash);
+        } catch (error) {
+            console.error('Error verifying password:', error);
+            return false;
+        }
+    },
+    
+    // Initialize the users table and create default users
+    async initializeUsers(pool) {
+        try {
+            // Create users table if it doesn't exist
+            await pool.query(`
+                CREATE TABLE IF NOT EXISTS users (
+                    userid INT AUTO_INCREMENT PRIMARY KEY,
+                    email VARCHAR(255) NOT NULL UNIQUE,
+                    password VARCHAR(255) NOT NULL,
+                    admin BOOLEAN DEFAULT FALSE,
+                    createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                )
+            `);
+            
+            console.log('Users table created or already exists');
+            
+            // Define initial users
+            const initialUsers = [
+                {
+                    email: 'admin@example.com',
+                    password: 'Admin@123',
+                    admin: true
+                },
+                {
+                    email: 'user@example.com',
+                    password: 'User@123',
+                    admin: false
+                }
+            ];
+            
+            // Add each initial user if they don't already exist
+            for (const user of initialUsers) {
+                const [existingUsers] = await pool.query(
+                    'SELECT * FROM users WHERE email = ?',
+                    [user.email]
+                );
+                
+                if (existingUsers.length === 0) {
+                    const hashedPassword = await authUtils.hashPassword(user.password);
+                    await pool.query(
+                        'INSERT INTO users (email, password, admin) VALUES (?, ?, ?)',
+                        [user.email, hashedPassword, user.admin]
+                    );
+                    console.log(`User ${user.email} added`);
+                } else {
+                    console.log(`User ${user.email} already exists`);
+                }
+            }
+        } catch (error) {
+            console.error('Error initializing users:', error);
+        }
+    },
+    
+    // Check if a user is authenticated
+    isAuthenticated(req) {
+        return req.session && req.session.userId && req.session.isAuthenticated;
+    },
+    
+    // Check if a user is an admin
+    isAdmin(req) {
+        return req.session && req.session.isAdmin === true;
+    },
+    
+    // Authentication middleware
+    authenticate(req, res, next) {
+        if (authUtils.isAuthenticated(req)) {
+            next();
+        } else {
+            res.status(401).json({ error: 'Authentication required' });
+        }
+    },
+    
+    // Admin authorization middleware
+    authorizeAdmin(req, res, next) {
+        if (authUtils.isAuthenticated(req) && authUtils.isAdmin(req)) {
+            next();
+        } else {
+            res.status(403).json({ error: 'Admin privileges required' });
+        }
+    }
+};
 
 // Session configuration
 app.use(session({
@@ -20,7 +131,7 @@ app.use(session({
         secure: process.env.NODE_ENV === 'production',
         httpOnly: true,
         sameSite: 'strict', // Helps prevent CSRF - additional protection
-        maxAge: 24 * 60 * 60 * 1000 // 24 hours
+        maxAge: 3 * 24 * 60 * 60 * 1000 // 3 days as per requirements
     }
 }));
 
@@ -299,8 +410,12 @@ app.use((req, res, next) => {
 
 // Test database connection on server start
 pool.getConnection()
-    .then(connection => {
+    .then(async connection => {
         console.log('Successfully connected to MySQL database');
+        
+        // Initialize users table and default users
+        await authUtils.initializeUsers(pool);
+        
         connection.release();
     })
     .catch(err => {
@@ -623,39 +738,138 @@ app.get('/api/login-form', (req, res) => {
     `);
 });
 
-// Login endpoint with additional login CSRF protection
-app.post('/api/login', csrfProtection.verifyRequest, (req, res) => {
-    const { username, password, loginNonce } = req.body;
-    
-    // Verify login nonce to prevent login CSRF
-    if (!loginNonce || loginNonce !== req.session.loginNonce) {
-        return res.status(403).json({ error: 'Invalid login request' });
-    }
-    
-    // Clear the login nonce to prevent reuse
-    req.session.loginNonce = null;
-    
-    // Here you would normally validate credentials against database
-    // This is a simplified example
-    if (username === 'admin' && password === 'admin123') {
-        // Set authenticated session
-        req.session.isAuthenticated = true;
-        req.session.username = username;
+// Login endpoint
+app.post('/api/login', async (req, res) => {
+    try {
+        const { email, password } = req.body;
+        if (!email || !password) {
+            return res.status(400).json({ error: 'Email and password are required' });
+        }
+
+        const db = await getDB();
+        const user = await db.get('SELECT * FROM users WHERE email = ?', [email]);
         
-        // Generate a new CSRF token after login
-        const newCsrfToken = csrfProtection.generateToken(req);
-        
-        return res.json({
-            success: true,
-            message: 'Login successful',
-            csrfToken: newCsrfToken
+        if (!user) {
+            return res.status(401).json({ error: 'Invalid credentials' });
+        }
+
+        const match = await bcrypt.compare(password, user.password);
+        if (!match) {
+            return res.status(401).json({ error: 'Invalid credentials' });
+        }
+
+        // Generate a session ID and save it
+        const sessionId = crypto.randomBytes(64).toString('hex');
+        const now = new Date().getTime();
+        const expiresAt = now + (24 * 60 * 60 * 1000); // 24 hours
+
+        await db.run(
+            'INSERT INTO sessions (session_id, user_id, expires_at) VALUES (?, ?, ?)',
+            [sessionId, user.userid, expiresAt]
+        );
+
+        // Set the session cookie
+        res.cookie('sessionId', sessionId, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            maxAge: 24 * 60 * 60 * 1000, // 24 hours
+            sameSite: 'strict'
         });
+
+        // Store user data in session for use in the client
+        req.session.userId = user.userid;
+        req.session.userEmail = user.email;
+        req.session.isAdmin = user.is_admin === 1;
+        
+        return res.status(200).json({ 
+            success: true,
+            user: {
+                email: user.email,
+                isAdmin: user.is_admin === 1
+            }
+        });
+    } catch (error) {
+        console.error('Login error:', error);
+        return res.status(500).json({ error: 'Internal server error' });
     }
-    
-    return res.status(401).json({
-        success: false,
-        error: 'Invalid credentials'
-    });
+});
+
+// Logout endpoint
+app.post('/api/logout', async (req, res) => {
+    try {
+        const sessionId = req.cookies.sessionId;
+        
+        if (sessionId) {
+            const db = await getDB();
+            
+            // Delete the session from the database
+            await db.run('DELETE FROM sessions WHERE session_id = ?', [sessionId]);
+            
+            // Clear the session cookie
+            res.clearCookie('sessionId');
+            
+            // Clear session data
+            req.session.destroy();
+        }
+        
+        res.status(200).json({ success: true });
+    } catch (error) {
+        console.error('Logout error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Change password endpoint
+app.post('/api/change-password', async (req, res) => {
+    try {
+        const sessionId = req.cookies.sessionId;
+        if (!sessionId) {
+            return res.status(401).json({ error: 'Not authenticated' });
+        }
+        
+        const db = await getDB();
+        const session = await db.get('SELECT * FROM sessions WHERE session_id = ?', [sessionId]);
+        
+        if (!session) {
+            return res.status(401).json({ error: 'Invalid session' });
+        }
+        
+        // Check if session is expired
+        const now = new Date().getTime();
+        if (now > session.expires_at) {
+            await db.run('DELETE FROM sessions WHERE session_id = ?', [sessionId]);
+            return res.status(401).json({ error: 'Session expired' });
+        }
+        
+        const { currentPassword, newPassword } = req.body;
+        if (!currentPassword || !newPassword) {
+            return res.status(400).json({ error: 'Current password and new password are required' });
+        }
+        
+        // Get user from database
+        const user = await db.get('SELECT * FROM users WHERE userid = ?', [session.user_id]);
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        
+        // Verify current password
+        const match = await bcrypt.compare(currentPassword, user.password);
+        if (!match) {
+            return res.status(401).json({ error: 'Current password is incorrect' });
+        }
+        
+        // Hash new password
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(newPassword, salt);
+        
+        // Update password in database
+        await db.run('UPDATE users SET password = ? WHERE userid = ?', [hashedPassword, user.userid]);
+        
+        return res.status(200).json({ success: true });
+    } catch (error) {
+        console.error('Change password error:', error);
+        return res.status(500).json({ error: 'Internal server error' });
+    }
 });
 
 // Error handling middleware

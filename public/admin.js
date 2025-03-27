@@ -258,23 +258,106 @@ document.getElementById('product-image').addEventListener('change', (event) => {
 document.getElementById('category-form').addEventListener('submit', handleCategorySubmit);
 document.getElementById('product-form').addEventListener('submit', handleProductSubmit);
 
+// Handle user logout
+const handleLogout = async () => {
+    try {
+        const response = await safeFetch('/api/logout', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (response.ok) {
+            // Clear session storage
+            sessionStorage.removeItem('userEmail');
+            sessionStorage.removeItem('isAdmin');
+            sessionStorage.removeItem('csrfToken');
+            
+            // Redirect to login page
+            window.location.href = '/login.html';
+        } else {
+            showMessage('Logout failed. Please try again.', true);
+        }
+    } catch (error) {
+        console.error('Logout error:', error);
+        showMessage('An error occurred during logout.', true);
+    }
+};
+
+// Setup event listeners for user actions
+const setupUserActions = () => {
+    const logoutButton = document.getElementById('logout-button');
+    if (logoutButton) {
+        logoutButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            handleLogout();
+        });
+    }
+    
+    const changePasswordButton = document.getElementById('change-password-button');
+    if (changePasswordButton) {
+        changePasswordButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            // Reset any previous error messages
+            const errorMessage = document.getElementById('error-message');
+            if (errorMessage) {
+                errorMessage.textContent = '';
+                errorMessage.style.display = 'none';
+            }
+            
+            // Show password change modal
+            const modal = new bootstrap.Modal(document.getElementById('passwordChangeModal'));
+            modal.show();
+        });
+    }
+};
+
 // First, fetch the CSRF token, then load initial data
 (async () => {
-    await fetchCsrfToken();
-    
-    // Inject CSRF tokens into the forms
-    const categoryPlaceholder = document.getElementById('csrf-category-placeholder');
-    const productPlaceholder = document.getElementById('csrf-product-placeholder');
-    
-    if (categoryPlaceholder) {
-        categoryPlaceholder.innerHTML = `<input type="hidden" name="_csrf" value="${csrfToken}">`;
+    try {
+        // Check if we're authenticated first
+        const checkAuth = await fetch('/api/categories');
+        if (!checkAuth.ok) {
+            // If not authenticated, redirect to login
+            window.location.href = '/login.html';
+            return;
+        }
+        
+        await fetchCsrfToken();
+        
+        // Inject CSRF tokens into the forms
+        const categoryPlaceholder = document.getElementById('csrf-category-placeholder');
+        const productPlaceholder = document.getElementById('csrf-product-placeholder');
+        
+        if (categoryPlaceholder) {
+            categoryPlaceholder.innerHTML = `<input type="hidden" name="_csrf" value="${csrfToken}">`;
+        }
+        
+        if (productPlaceholder) {
+            productPlaceholder.innerHTML = `<input type="hidden" name="_csrf" value="${csrfToken}">`;
+        }
+        
+        // Store the CSRF token in session storage for use in other requests
+        sessionStorage.setItem('csrfToken', csrfToken);
+        
+        // Update user email display if available
+        if (sessionStorage.getItem('userEmail')) {
+            const userEmailElement = document.getElementById('user-email');
+            if (userEmailElement) {
+                userEmailElement.textContent = sessionStorage.getItem('userEmail');
+            }
+        }
+        
+        // Setup user action event listeners
+        setupUserActions();
+        
+        // Load data after CSRF setup is complete
+        loadCategories();
+        loadProducts();
+    } catch (error) {
+        console.error('Error initializing admin panel:', error);
+        // Redirect to login on error
+        window.location.href = '/login.html';
     }
-    
-    if (productPlaceholder) {
-        productPlaceholder.innerHTML = `<input type="hidden" name="_csrf" value="${csrfToken}">`;
-    }
-    
-    // Load data after CSRF setup is complete
-    loadCategories();
-    loadProducts();
 })(); 

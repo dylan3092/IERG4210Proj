@@ -1,0 +1,44 @@
+/* Login Page Styles */
+.login-page {
+    background-color: #f8f9fa;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+}
+
+.login-page .card {
+    border-radius: 10px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+}
+
+.login-page .card-header {
+    padding: 1.5rem;
+}
+
+.login-page .card-body {
+    padding: 2rem;
+}
+
+/* Admin Panel User Section */
+.user-section {
+    display: flex;
+    align-items: center;
+    margin-right: 1rem;
+}
+
+.user-email {
+    margin-right: 1rem;
+    font-weight: bold;
+}
+
+/* Password Change Modal */
+#passwordChangeModal .modal-header {
+    background-color: #007bff;
+    color: white;
+}
+
+#success-message {
+    color: #28a745;
+    font-weight: bold;
+} 
