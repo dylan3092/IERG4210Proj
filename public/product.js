@@ -104,19 +104,19 @@ function validateQuantity(input) {
     if (isNaN(value) || value < 1) {
         input.value = 1;
         value = 1;
+        input.classList.add('shop-error');
+        if (errorDiv) {
+            errorDiv.textContent = 'Quantity must be a valid number';
+        }
+        return false;
     } else if (value > 100) {
         input.value = 100;
         value = 100;
-    }
-
-    // Show error message if needed
-    if (value < 1 || value > 100) {
         input.classList.add('shop-error');
         if (errorDiv) {
-            errorDiv.textContent = value < 1 ? 
-                'Quantity must be at least 1' : 
-                'Maximum quantity is 100';
+            errorDiv.textContent = 'Maximum quantity is 100';
         }
+        return false;
     }
 
     return value;
@@ -127,7 +127,7 @@ function addToCart(productId, quantity) {
     const quantityInput = document.getElementById('quantity');
     const validatedQuantity = validateQuantity(quantityInput);
     
-    if (validatedQuantity >= 1 && validatedQuantity <= 100) {
+    if (validatedQuantity && validatedQuantity >= 1 && validatedQuantity <= 100) {
         // Add to cart with validated quantity
         cart.addItem(productId, validatedQuantity);
     }
