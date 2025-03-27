@@ -1,15 +1,19 @@
+// Import environment variables
+require('dotenv').config();
+
+// Import required modules
 const express = require('express');
-const mysql = require('mysql2/promise');
-const multer = require('multer');
 const path = require('path');
-const fs = require('fs');
-const sharp = require('sharp');
-const xss = require('xss');
-const crypto = require('crypto');
+const fs = require('fs'); // Make sure fs is imported at the top
+const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser');
 const session = require('express-session');
-const bcrypt = require('bcryptjs'); // Changed from bcrypt to bcryptjs
+const mysql = require('mysql2/promise');
+const bcrypt = require('bcryptjs');
 const cors = require('cors');
+const multer = require('multer');
+const crypto = require('crypto');
+const xss = require('xss');
 const https = require('https'); // Also import https at the top
 
 const app = express();
@@ -58,16 +62,16 @@ const authUtils = {
             
             console.log('Users table created or already exists');
             
-            // Define initial users
+            // Define initial users using environment variables
             const initialUsers = [
                 {
-                    email: 'admin@example.com',
-                    password: 'Admin@123',
+                    email: process.env.ADMIN_EMAIL || 'admin@example.com',
+                    password: process.env.ADMIN_PASSWORD || 'Admin@123',
                     admin: true
                 },
                 {
-                    email: 'user@example.com',
-                    password: 'User@123',
+                    email: process.env.USER_EMAIL || 'user@example.com',
+                    password: process.env.USER_PASSWORD || 'User@123',
                     admin: false
                 }
             ];
@@ -202,13 +206,12 @@ const authUtils = {
 
 // Generate a strong, persistent secret for the session
 const getOrCreateSessionSecret = () => {
-    // Try to get from environment variable first (most secure option)
+    // Use environment variable first (recommended for production)
     if (process.env.SESSION_SECRET && process.env.SESSION_SECRET.length >= 32) {
         return process.env.SESSION_SECRET;
     }
     
-    // Generate a cryptographically secure random secret
-    // This will change on server restart, but that's better than a weak secret
+    // Generate a cryptographically secure random secret as fallback
     console.log('WARNING: No SESSION_SECRET environment variable set. Generating a random one.');
     console.log('This will invalidate all sessions when the server restarts.');
     console.log('For production, set a strong SESSION_SECRET environment variable.');
@@ -241,12 +244,12 @@ app.use(session({
 
 // Generate a strong, persistent secret for CSRF protection
 const getOrCreateCsrfSecret = () => {
-    // Try to get from environment variable first (most secure option)
+    // Use environment variable first (recommended for production)
     if (process.env.CSRF_SECRET && process.env.CSRF_SECRET.length >= 32) {
         return process.env.CSRF_SECRET;
     }
     
-    // Generate a cryptographically secure random secret
+    // Generate a cryptographically secure random secret as fallback
     console.log('WARNING: No CSRF_SECRET environment variable set. Generating a random one.');
     console.log('This will invalidate all CSRF tokens when the server restarts.');
     console.log('For production, set a strong CSRF_SECRET environment variable.');
@@ -610,10 +613,11 @@ try {
 
 // Database connection
 const pool = mysql.createPool({
-    host: 'localhost',
-    user: 'root',
-    password: 'P@ssWord1', // Make sure this matches your MySQL password
-    database: 'shopping_db',
+    host: process.env.DB_HOST || 'localhost',
+    user: process.env.DB_USER || 'root',
+    password: process.env.DB_PASSWORD, // Using environment variable for security
+    database: process.env.DB_NAME || 'shopping_db',
+    port: process.env.DB_PORT || 3306,
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0
