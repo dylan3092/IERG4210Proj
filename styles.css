@@ -510,14 +510,14 @@ button[type="submit"]:disabled {
 .notification {
     position: fixed;
     top: 20px;
-    right: 20px;
+    left: 20px;
     background-color: #4CAF50;
     color: white;
     padding: 15px 25px;
     border-radius: 4px;
     box-shadow: 0 2px 5px rgba(0,0,0,0.2);
     z-index: 1000;
-    animation: slideIn 0.3s ease-out;
+    animation: slideInFromLeft 0.3s ease-out;
     max-width: 300px;
     text-align: center;
 }
@@ -536,16 +536,10 @@ button[type="submit"]:disabled {
     overflow-y: auto;
 }
 
-/* Adjust notification position to not overlap with cart */
-@media (min-width: 768px) {
-    .notification {
-        right: 320px; /* Position to the left of the cart */
-    }
-}
-
-@keyframes slideIn {
+/* Animation for left side notification */
+@keyframes slideInFromLeft {
     from {
-        transform: translateX(100%);
+        transform: translateX(-100%);
         opacity: 0;
     }
     to {
@@ -554,13 +548,13 @@ button[type="submit"]:disabled {
     }
 }
 
-@keyframes slideOut {
+@keyframes slideOutToLeft {
     from {
         transform: translateX(0);
         opacity: 1;
     }
     to {
-        transform: translateX(100%);
+        transform: translateX(-100%);
         opacity: 0;
     }
 }

@@ -85,8 +85,19 @@ class ShoppingCart {
         this.isLoading = true;
         
         try {
+            // Strict validation - reject invalid inputs
+            if (!/^\d+$/.test(quantity.toString())) {
+                console.error('Invalid quantity format');
+                this.isLoading = false;
+                return;
+            }
+            
             quantity = parseInt(quantity);
-            if (isNaN(quantity) || quantity < 1) quantity = 1;
+            if (isNaN(quantity) || quantity < 1 || quantity > 100) {
+                console.error('Invalid quantity value');
+                this.isLoading = false;
+                return;
+            }
 
             // Fetch product details first to verify it exists
             const productDetails = await this.fetchProductDetails(productId);
@@ -301,7 +312,7 @@ class CartUIController {
         // Remove the feedback after animation completes
         setTimeout(() => {
             feedback.style.opacity = '0';
-            feedback.style.transform = 'translateX(100%)';
+            feedback.style.transform = 'translateX(-100%)';
             feedback.style.transition = 'opacity 0.3s, transform 0.3s';
             
             setTimeout(() => {
