@@ -1,7 +1,55 @@
 // API endpoints
 const API = {
     categories: '/api/categories',
-    products: '/api/products'
+    products: '/api/products',
+    csrfToken: '/api/csrf-token' // New endpoint for CSRF token
+};
+
+// CSRF token management
+let csrfToken = '';
+
+// Fetch CSRF token on page load
+const fetchCsrfToken = async () => {
+    try {
+        const response = await fetch(API.csrfToken);
+        const data = await response.json();
+        csrfToken = data.csrfToken;
+        console.log('CSRF token fetched');
+    } catch (error) {
+        console.error('Failed to fetch CSRF token:', error);
+    }
+};
+
+// Apply CSRF token to a fetch request configuration
+const applyCsrf = (config = {}) => {
+    // Create a new config object to avoid modifying the original
+    const newConfig = { ...config };
+    
+    // Initialize headers if they don't exist
+    newConfig.headers = newConfig.headers || {};
+    
+    // Add CSRF token as a header
+    newConfig.headers['X-CSRF-Token'] = csrfToken;
+    
+    return newConfig;
+};
+
+// Enhanced fetch function with CSRF protection
+const safeFetch = async (url, options = {}) => {
+    // Apply CSRF token to the request
+    const configWithCsrf = applyCsrf(options);
+    
+    // Make the request
+    const response = await fetch(url, configWithCsrf);
+    
+    // If token is expired or invalid, try to refresh it and retry once
+    if (response.status === 403 && response.statusText.includes('CSRF')) {
+        await fetchCsrfToken();
+        configWithCsrf.headers['X-CSRF-Token'] = csrfToken;
+        return fetch(url, configWithCsrf);
+    }
+    
+    return response;
 };
 
 // Utility functions
@@ -52,14 +100,19 @@ const handleCategorySubmit = async (event) => {
     
     try {
         const catid = formData.get('catid');
-        const response = await fetch(API.categories + (catid ? `/${catid}` : ''), {
+        
+        // Add CSRF token to the data
+        const jsonData = {
+            name: formData.get('name'),
+            _csrf: csrfToken // Include CSRF token in the request body
+        };
+        
+        const response = await safeFetch(API.categories + (catid ? `/${catid}` : ''), {
             method: catid ? 'PUT' : 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                name: formData.get('name')
-            })
+            body: JSON.stringify(jsonData)
         });
 
         if (!response.ok) {
@@ -90,7 +143,7 @@ const deleteCategory = async (catid) => {
     if (!confirm('Are you sure you want to delete this category?')) return;
     
     try {
-        await fetch(`${API.categories}/${catid}`, {
+        await safeFetch(`${API.categories}/${catid}`, {
             method: 'DELETE'
         }).then(handleResponse);
 
@@ -124,9 +177,12 @@ const handleProductSubmit = async (event) => {
     event.preventDefault();
     const formData = new FormData(event.target);
     
+    // Add CSRF token to form data
+    formData.append('_csrf', csrfToken);
+    
     try {
         const pid = formData.get('pid');
-        const response = await fetch(API.products + (pid ? `/${pid}` : ''), {
+        const response = await safeFetch(API.products + (pid ? `/${pid}` : ''), {
             method: pid ? 'PUT' : 'POST',
             body: formData // Send FormData directly for file upload
         });
@@ -168,7 +224,7 @@ const deleteProduct = async (pid) => {
     if (!confirm('Are you sure you want to delete this product?')) return;
     
     try {
-        await fetch(`${API.products}/${pid}`, {
+        await safeFetch(`${API.products}/${pid}`, {
             method: 'DELETE'
         }).then(handleResponse);
 
@@ -202,6 +258,23 @@ document.getElementById('product-image').addEventListener('change', (event) => {
 document.getElementById('category-form').addEventListener('submit', handleCategorySubmit);
 document.getElementById('product-form').addEventListener('submit', handleProductSubmit);
 
-// Load initial data
-loadCategories();
-loadProducts(); 
+// First, fetch the CSRF token, then load initial data
+(async () => {
+    await fetchCsrfToken();
+    
+    // Inject CSRF tokens into the forms
+    const categoryPlaceholder = document.getElementById('csrf-category-placeholder');
+    const productPlaceholder = document.getElementById('csrf-product-placeholder');
+    
+    if (categoryPlaceholder) {
+        categoryPlaceholder.innerHTML = `<input type="hidden" name="_csrf" value="${csrfToken}">`;
+    }
+    
+    if (productPlaceholder) {
+        productPlaceholder.innerHTML = `<input type="hidden" name="_csrf" value="${csrfToken}">`;
+    }
+    
+    // Load data after CSRF setup is complete
+    loadCategories();
+    loadProducts();
+})(); 

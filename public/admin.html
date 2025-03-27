@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Panel - Dummy Shop</title>
     <style>
         .form-group { margin-bottom: 15px; }
@@ -20,6 +21,7 @@
         <!-- Add/Update Category Form -->
         <form id="category-form" enctype="multipart/form-data">
             <input type="hidden" id="category-id" name="catid">
+            <div id="csrf-category-placeholder"></div>
             <div class="form-group">
                 <label for="category-name">Category Name:</label>
                 <input type="text" id="category-name" name="name" required 
@@ -42,6 +44,7 @@
         <!-- Add/Update Product Form -->
         <form id="product-form" enctype="multipart/form-data">
             <input type="hidden" id="product-id" name="pid">
+            <div id="csrf-product-placeholder"></div>
             
             <div class="form-group">
                 <label for="product-category">Category:</label>

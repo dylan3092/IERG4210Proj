@@ -6,8 +6,149 @@ const fs = require('fs/promises');
 const sharp = require('sharp');
 const xss = require('xss');
 const crypto = require('crypto');
+const cookieParser = require('cookie-parser');
+const session = require('express-session');
 
 const app = express();
+
+// Session configuration
+app.use(session({
+    secret: crypto.randomBytes(32).toString('hex'),
+    resave: false,
+    saveUninitialized: true,
+    cookie: {
+        secure: process.env.NODE_ENV === 'production',
+        httpOnly: true,
+        sameSite: 'strict', // Helps prevent CSRF - additional protection
+        maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    }
+}));
+
+// CSRF Protection Middleware
+const csrfProtection = {
+    // Generate a CSRF token based on session ID and a secret
+    generateToken: (req) => {
+        if (!req.session) {
+            throw new Error('Session middleware required');
+        }
+        
+        const sessionId = req.session.id;
+        // Create a HMAC using the session ID and a secret key
+        const hmac = crypto.createHmac('sha256', process.env.CSRF_SECRET || 'csrf-secret-key');
+        hmac.update(sessionId);
+        return hmac.digest('hex');
+    },
+    
+    // Verify that the token is valid
+    verifyToken: (req, token) => {
+        if (!token) return false;
+        const expectedToken = csrfProtection.generateToken(req);
+        // Use timing-safe comparison to prevent timing attacks
+        return crypto.timingSafeEqual(
+            Buffer.from(token),
+            Buffer.from(expectedToken)
+        );
+    },
+    
+    // Middleware to inject CSRF token into res.locals
+    injectToken: (req, res, next) => {
+        const csrfToken = csrfProtection.generateToken(req);
+        res.locals.csrfToken = csrfToken;
+        // Also add a hidden input field HTML snippet for convenience
+        res.locals.csrfField = `<input type="hidden" name="_csrf" value="${csrfToken}">`;
+        next();
+    },
+    
+    // Middleware to verify CSRF token in requests
+    verifyRequest: (req, res, next) => {
+        // Skip CSRF check for GET, HEAD, OPTIONS requests - they should be safe
+        if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
+            return next();
+        }
+        
+        // Get token from various possible sources
+        const token = 
+            req.body._csrf || 
+            req.query._csrf || 
+            req.headers['csrf-token'] || 
+            req.headers['x-csrf-token'] || 
+            req.headers['x-xsrf-token'];
+        
+        // Check for token existence and validity
+        if (!token) {
+            return res.status(403).json({ 
+                error: 'CSRF token missing' 
+            });
+        }
+        
+        // Validate the token
+        try {
+            if (!csrfProtection.verifyToken(req, token)) {
+                return res.status(403).json({ 
+                    error: 'Invalid CSRF token' 
+                });
+            }
+        } catch (error) {
+            return res.status(403).json({ 
+                error: 'CSRF validation error' 
+            });
+        }
+        
+        next();
+    },
+    
+    // A simple API to get a new token (useful for SPA applications)
+    getTokenAPI: (req, res) => {
+        return res.json({ csrfToken: csrfProtection.generateToken(req) });
+    }
+};
+
+// Origin validation middleware - Double verify the origin of requests
+const validateOrigin = (req, res, next) => {
+    const origin = req.headers.origin;
+    const referer = req.headers.referer;
+    
+    // Get our host from the request
+    const host = req.headers.host;
+    
+    // Skip check for GET requests - they should be safe
+    if (req.method === 'GET') {
+        return next();
+    }
+    
+    if (origin) {
+        // If origin header is present, check if it matches our domain
+        const originHost = new URL(origin).host;
+        if (originHost !== host) {
+            return res.status(403).json({ error: 'Invalid origin' });
+        }
+    } else if (referer) {
+        // If referer is present but origin is not, check referer
+        const refererHost = new URL(referer).host;
+        if (refererHost !== host) {
+            return res.status(403).json({ error: 'Invalid referer' });
+        }
+    } else {
+        // If neither origin nor referer is present for a non-GET request, reject
+        // This is a conservative approach - you might want to relax this for APIs
+        return res.status(403).json({ error: 'Origin validation failed' });
+    }
+    
+    next();
+};
+
+// Apply cookie parser middleware
+app.use(cookieParser());
+
+// Add CSRF protection to all requests
+app.use(csrfProtection.injectToken);
+app.use(validateOrigin);
+
+// Apply CSRF validation middleware to all routes that accept data
+app.use(csrfProtection.verifyRequest);
+
+// Add a route to get a CSRF token via API (useful for single page applications)
+app.get('/api/csrf-token', csrfProtection.getTokenAPI);
 
 // Input sanitization middleware
 const sanitizeInput = (req, res, next) => {
@@ -448,6 +589,73 @@ app.post('/api/csp-report', express.json({ type: 'application/csp-report' }), (r
 app.post('/api/csp-report', express.json({ type: 'application/reports+json' }), (req, res) => {
     console.log('CSP Violation (Reporting API):', req.body);
     res.status(204).end();
+});
+
+// Add a simple login route with CSRF protection
+app.get('/api/login-form', (req, res) => {
+    // Generate a login-specific nonce for this request
+    const loginNonce = crypto.randomBytes(16).toString('base64');
+    
+    // Store the nonce in session for validation
+    req.session.loginNonce = loginNonce;
+    
+    // Return the login form
+    res.send(`
+        <form method="POST" action="/api/login">
+            <h2>Admin Login</h2>
+            <div>
+                <label for="username">Username:</label>
+                <input type="text" id="username" name="username" required>
+            </div>
+            <div>
+                <label for="password">Password:</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            
+            <!-- CSRF Protection -->
+            <input type="hidden" name="_csrf" value="${res.locals.csrfToken}">
+            
+            <!-- Double CSRF protection for login - prevents login CSRF -->
+            <input type="hidden" name="loginNonce" value="${loginNonce}">
+            
+            <button type="submit">Login</button>
+        </form>
+    `);
+});
+
+// Login endpoint with additional login CSRF protection
+app.post('/api/login', csrfProtection.verifyRequest, (req, res) => {
+    const { username, password, loginNonce } = req.body;
+    
+    // Verify login nonce to prevent login CSRF
+    if (!loginNonce || loginNonce !== req.session.loginNonce) {
+        return res.status(403).json({ error: 'Invalid login request' });
+    }
+    
+    // Clear the login nonce to prevent reuse
+    req.session.loginNonce = null;
+    
+    // Here you would normally validate credentials against database
+    // This is a simplified example
+    if (username === 'admin' && password === 'admin123') {
+        // Set authenticated session
+        req.session.isAuthenticated = true;
+        req.session.username = username;
+        
+        // Generate a new CSRF token after login
+        const newCsrfToken = csrfProtection.generateToken(req);
+        
+        return res.json({
+            success: true,
+            message: 'Login successful',
+            csrfToken: newCsrfToken
+        });
+    }
+    
+    return res.status(401).json({
+        success: false,
+        error: 'Invalid credentials'
+    });
 });
 
 // Error handling middleware
