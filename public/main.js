@@ -69,9 +69,9 @@ function renderCategories() {
             const isActive = currentCategoryId == category.catid;
             return `
                 <li>
-                    <a href="/?category=${category.catid}" 
+                    <a href="/?category=${sanitize.attribute(category.catid)}" 
                        class="${isActive ? 'active' : ''}">
-                        ${category.name}
+                        ${sanitize.html(category.name)}
                     </a>
                 </li>
             `;
@@ -89,7 +89,7 @@ async function homeHandler(params) {
     try {
         // Fetch products based on category
         const productsUrl = categoryId 
-            ? `${BASE_URL}/api/products?category=${categoryId}`
+            ? `${BASE_URL}/api/products?category=${sanitize.html(categoryId)}`
             : `${BASE_URL}/api/products`;
             
         const response = await fetch(productsUrl);
@@ -99,8 +99,8 @@ async function homeHandler(params) {
         if (categoryId) {
             const selectedCategory = categoriesCache.find(c => c.catid == categoryId);
             if (selectedCategory) {
-                document.title = `${selectedCategory.name} - Dummy Shopping`;
-                updateBreadcrumb(selectedCategory.name);
+                document.title = `${sanitize.html(selectedCategory.name)} - Dummy Shopping`;
+                updateBreadcrumb(sanitize.html(selectedCategory.name));
             }
         } else {
             document.title = 'Dummy Shopping - Home';
@@ -121,15 +121,15 @@ async function homeHandler(params) {
             
             return `
                 <article class="product-item">
-                    <a href="/product.html?product=${product.pid}">
+                    <a href="/product.html?product=${sanitize.attribute(product.pid)}">
                         <img src="${product.thumbnail ? 
-                            `${BASE_URL}/uploads/${product.thumbnail}` : 
+                            sanitize.url(`${BASE_URL}/uploads/${product.thumbnail}`) : 
                             'images/default.jpg'}" 
-                            alt="${product.name}" width="150" height="150">
-                        <h3>${product.name}</h3>
+                            alt="${sanitize.html(product.name)}" width="150" height="150">
+                        <h3>${sanitize.html(product.name)}</h3>
                     </a>
-                    <p class="price">$${price.toFixed(2)}</p>
-                    <button type="button" onclick="addToCart(${product.pid}, 1)">Add to Cart</button>
+                    <p class="price">$${sanitize.html(price.toFixed(2))}</p>
+                    <button type="button" onclick="addToCart(${sanitize.attribute(product.pid)}, 1)">Add to Cart</button>
                 </article>
             `;
         }).join('');
@@ -152,7 +152,7 @@ async function productHandler(params) {
     
     try {
         // Fetch product details
-        const productResponse = await fetch(`${BASE_URL}/api/products/${productId}`);
+        const productResponse = await fetch(`${BASE_URL}/api/products/${sanitize.html(productId)}`);
         if (!productResponse.ok) {
             throw new Error('Product not found');
         }
@@ -160,10 +160,10 @@ async function productHandler(params) {
         const product = await productResponse.json();
         
         // Update page title
-        document.title = `${product.name} - Dummy Shopping`;
+        document.title = `${sanitize.html(product.name)} - Dummy Shopping`;
         
         // Update breadcrumb using category_name from API
-        updateBreadcrumb(product.category_name, product.name);
+        updateBreadcrumb(sanitize.html(product.category_name), sanitize.html(product.name));
         
         // Highlight active category
         renderCategories();
@@ -173,18 +173,18 @@ async function productHandler(params) {
             <div class="product-details">
                 <div class="product-image">
                     <img src="${product.image ? 
-                        `${BASE_URL}/uploads/${product.image}` : 
+                        sanitize.url(`${BASE_URL}/uploads/${product.image}`) : 
                         'images/default.jpg'}" 
-                        alt="${product.name}">
+                        alt="${sanitize.html(product.name)}">
                 </div>
                 <div class="product-info">
-                    <h1>${product.name}</h1>
-                    <p class="category">Category: ${product.category_name}</p>
-                    <p class="price">$${Number(product.price).toFixed(2)}</p>
-                    <p class="description">${product.description}</p>
+                    <h1>${sanitize.html(product.name)}</h1>
+                    <p class="category">Category: ${sanitize.html(product.category_name)}</p>
+                    <p class="price">$${sanitize.html(Number(product.price).toFixed(2))}</p>
+                    <p class="description">${sanitize.html(product.description)}</p>
                     <div class="purchase-controls">
                         <input type="number" id="quantity" value="1" min="1" max="99">
-                        <button onclick="addToCart(${product.pid}, document.getElementById('quantity').value)">
+                        <button onclick="addToCart(${sanitize.attribute(product.pid)}, document.getElementById('quantity').value)">
                             Add to Cart
                         </button>
                     </div>
@@ -207,7 +207,7 @@ function notFoundHandler() {
 // Error handler
 function errorHandler(error) {
     document.title = 'Error';
-    return `<h1>Error</h1><p>${error.message || 'An unknown error occurred.'}</p>`;
+    return `<h1>Error</h1><p>${sanitize.html(error.message || 'An unknown error occurred.')}</p>`;
 }
 
 // Function to update breadcrumb
@@ -217,8 +217,8 @@ function updateBreadcrumb(categoryName, productName) {
     
     breadcrumb.innerHTML = `
         <a href="/">Home</a>
-        ${categoryName ? `<span class="separator"> > </span><a href="/?category=${getCategoryId(categoryName)}">${categoryName}</a>` : ''}
-        ${productName ? `<span class="separator"> > </span><span>${productName}</span>` : ''}
+        ${categoryName ? `<span class="separator"> > </span><a href="/?category=${sanitize.attribute(getCategoryId(categoryName))}">${sanitize.html(categoryName)}</a>` : ''}
+        ${productName ? `<span class="separator"> > </span><span>${sanitize.html(productName)}</span>` : ''}
     `;
 }
 

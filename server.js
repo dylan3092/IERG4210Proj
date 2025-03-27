@@ -98,6 +98,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
 app.use('/uploads', express.static('uploads'));
+app.use('/js', express.static('public/js'));  // Ensure public/js directory is properly served
 
 // Add this near the top, after creating the app
 app.use((req, res, next) => {

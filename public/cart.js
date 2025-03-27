@@ -44,17 +44,20 @@ class ShoppingCart {
         try {
             const savedCart = localStorage.getItem('shopping_cart');
             if (savedCart) {
-                const parsedCart = JSON.parse(savedCart);
+                // Sanitize JSON before parsing
+                const parsedCart = sanitize.json(savedCart);
                 
                 // Convert plain objects to CartItem instances
-                Object.entries(parsedCart.items).forEach(([pid, item]) => {
-                    this.items[pid] = new CartItem(
-                        pid, 
-                        item.name, 
-                        item.price, 
-                        item.quantity, 
-                        item.image
-                    );
+                Object.entries(parsedCart.items || {}).forEach(([pid, item]) => {
+                    if (item && typeof item === 'object') {
+                        this.items[pid] = new CartItem(
+                            pid, 
+                            item.name || '', 
+                            item.price || 0, 
+                            item.quantity || 1, 
+                            item.image || null
+                        );
+                    }
                 });
                 
                 // Preload images for items in cart
@@ -86,6 +89,8 @@ class ShoppingCart {
         
         try {
             // Strict validation - reject invalid inputs
+            const sanitizedProductId = sanitize.html(productId);
+            
             if (!/^\d+$/.test(quantity.toString())) {
                 console.error('Invalid quantity format');
                 this.isLoading = false;
@@ -93,27 +98,27 @@ class ShoppingCart {
             }
             
             quantity = parseInt(quantity);
-            if (isNaN(quantity) || quantity < 1 || quantity > 2147483646) {
+            if (isNaN(quantity) || quantity < 1 || quantity > 100) {
                 console.error('Invalid quantity value');
                 this.isLoading = false;
                 return;
             }
 
             // Fetch product details first to verify it exists
-            const productDetails = await this.fetchProductDetails(productId);
+            const productDetails = await this.fetchProductDetails(sanitizedProductId);
             if (!productDetails) {
                 throw new Error('Product not found');
             }
 
             // Preload image
-            await this.preloadProductImage(productId);
+            await this.preloadProductImage(sanitizedProductId);
 
             // Update cart
-            if (this.items[productId]) {
-                this.items[productId].updateQuantity(this.items[productId].quantity + quantity);
+            if (this.items[sanitizedProductId]) {
+                this.items[sanitizedProductId].updateQuantity(this.items[sanitizedProductId].quantity + quantity);
             } else {
-                this.items[productId] = new CartItem(
-                    productId,
+                this.items[sanitizedProductId] = new CartItem(
+                    sanitizedProductId,
                     productDetails.name,
                     productDetails.price,
                     quantity,
@@ -123,7 +128,7 @@ class ShoppingCart {
 
             // Save and notify
             this.save();
-            this.emit('itemAdded', { productId, quantity });
+            this.emit('itemAdded', { productId: sanitizedProductId, quantity });
             
         } catch (error) {
             console.error('Error adding to cart:', error);
@@ -134,21 +139,26 @@ class ShoppingCart {
 
     // Update item quantity
     updateQuantity(productId, newQuantity) {
+        const sanitizedProductId = sanitize.html(productId);
+        newQuantity = sanitize.number(newQuantity, 0);
+        
         if (newQuantity < 1) {
-            this.removeItem(productId);
+            this.removeItem(sanitizedProductId);
             return;
         }
 
-        if (this.items[productId]) {
-            this.items[productId].updateQuantity(newQuantity);
+        if (this.items[sanitizedProductId]) {
+            this.items[sanitizedProductId].updateQuantity(newQuantity);
             this.save();
         }
     }
 
     // Remove item from cart
     removeItem(productId) {
-        if (this.items[productId]) {
-            delete this.items[productId];
+        const sanitizedProductId = sanitize.html(productId);
+        
+        if (this.items[sanitizedProductId]) {
+            delete this.items[sanitizedProductId];
             this.save();
         }
     }
@@ -171,13 +181,15 @@ class ShoppingCart {
 
     // Preload product images
     async preloadProductImage(productId) {
-        if (!this.imageCache.has(productId) && this.items[productId]) {
+        const sanitizedProductId = sanitize.html(productId);
+        
+        if (!this.imageCache.has(sanitizedProductId) && this.items[sanitizedProductId]) {
             try {
-                const product = await this.fetchProductDetails(productId);
+                const product = await this.fetchProductDetails(sanitizedProductId);
                 if (product && product.image) {
                     const img = new Image();
-                    img.src = `${BASE_URL}/uploads/${product.image}`;
-                    this.imageCache.set(productId, img);
+                    img.src = sanitize.url(`${BASE_URL}/uploads/${product.image}`);
+                    this.imageCache.set(sanitizedProductId, img);
                 }
             } catch (error) {
                 console.error('Error preloading image:', error);
@@ -188,12 +200,23 @@ class ShoppingCart {
     // Fetch product details via AJAX
     async fetchProductDetails(productId) {
         try {
-            const response = await fetch(`${BASE_URL}/api/products/${productId}`);
+            const sanitizedProductId = encodeURIComponent(sanitize.html(productId));
+            const response = await fetch(`${BASE_URL}/api/products/${sanitizedProductId}`);
             if (!response.ok) {
                 throw new Error('Product not found');
             }
             
-            return await response.json();
+            const data = await response.json();
+            // Sanitize response data
+            return {
+                pid: sanitize.html(data.pid),
+                name: sanitize.html(data.name),
+                price: sanitize.number(data.price, 0),
+                image: data.image ? sanitize.html(data.image) : null,
+                description: sanitize.html(data.description),
+                catid: sanitize.html(data.catid),
+                category_name: sanitize.html(data.category_name)
+            };
             
         } catch (error) {
             console.error('Error fetching product details:', error);
@@ -248,20 +271,20 @@ class CartUIController {
 
         // Prepare new content with cached images
         const newContent = Object.entries(this.cart.items).map(([pid, item]) => `
-            <li class="cart-item" data-pid="${pid}">
+            <li class="cart-item" data-pid="${sanitize.attribute(pid)}">
                 <div class="item-image">
                     ${this.cart.imageCache.has(pid) ? 
-                        `<img src="${this.cart.imageCache.get(pid).src}" alt="${item.name}" width="50">` : 
+                        `<img src="${sanitize.url(this.cart.imageCache.get(pid).src)}" alt="${sanitize.attribute(item.name)}" width="50">` : 
                         ''}
                 </div>
-                <span class="item-name">${item.name}</span>
+                <span class="item-name">${sanitize.html(item.name)}</span>
                 <div class="item-controls">
-                    <button class="quantity-btn" onclick="cartController.updateQuantity('${pid}', ${item.quantity - 1})">-</button>
-                    <span class="item-quantity">${item.quantity}</span>
-                    <button class="quantity-btn" onclick="cartController.updateQuantity('${pid}', ${item.quantity + 1})">+</button>
+                    <button class="quantity-btn" onclick="cartController.updateQuantity('${sanitize.script(pid)}', ${sanitize.html(item.quantity - 1)})">-</button>
+                    <span class="item-quantity">${sanitize.html(item.quantity)}</span>
+                    <button class="quantity-btn" onclick="cartController.updateQuantity('${sanitize.script(pid)}', ${sanitize.html(item.quantity + 1)})">+</button>
                 </div>
-                <span class="item-price">$${item.getTotal().toFixed(2)}</span>
-                <button class="remove-item" onclick="cartController.removeItem('${pid}')">×</button>
+                <span class="item-price">$${sanitize.html(item.getTotal().toFixed(2))}</span>
+                <button class="remove-item" onclick="cartController.removeItem('${sanitize.script(pid)}')">×</button>
             </li>
         `).join('');
 
@@ -292,7 +315,7 @@ class CartUIController {
             const progress = Math.min(elapsed / duration, 1);
 
             const current = start + (end - start) * progress;
-            element.textContent = `$${current.toFixed(2)}`;
+            element.textContent = `$${sanitize.html(current.toFixed(2))}`;
 
             if (progress < 1) {
                 requestAnimationFrame(update);
@@ -329,8 +352,9 @@ class CartUIController {
 
     // Add this method to handle item removal
     removeItem(productId) {
-        if (this.cart.items[productId]) {
-            this.cart.removeItem(productId);
+        const sanitizedProductId = sanitize.html(productId);
+        if (this.cart.items[sanitizedProductId]) {
+            this.cart.removeItem(sanitizedProductId);
         }
     }
 }
@@ -341,15 +365,18 @@ const cartController = new CartUIController(cart);
 
 // Public API for use in HTML
 function addToCart(productId, quantity = 1) {
-    cart.addItem(productId, quantity);
+    const sanitizedProductId = sanitize.html(productId);
+    cart.addItem(sanitizedProductId, sanitize.number(quantity, 1));
 }
 
 function updateQuantity(productId, newQuantity) {
-    cartController.updateQuantity(productId, newQuantity);
+    const sanitizedProductId = sanitize.html(productId);
+    cartController.updateQuantity(sanitizedProductId, sanitize.number(newQuantity, 1));
 }
 
 function removeFromCart(productId) {
-    cartController.removeItem(productId);
+    const sanitizedProductId = sanitize.html(productId);
+    cartController.removeItem(sanitizedProductId);
 }
 
 // Initialize cart functionality
@@ -365,11 +392,13 @@ window.cartController = cartController;
 
 // Add these methods to CartUIController class
 CartUIController.prototype.updateQuantity = function(productId, newQuantity) {
-  this.cart.updateQuantity(productId, newQuantity);
+  const sanitizedProductId = sanitize.html(productId);
+  this.cart.updateQuantity(sanitizedProductId, sanitize.number(newQuantity, 1));
   this.updateDisplay();
 };
 
 CartUIController.prototype.removeItem = function(productId) {
-  this.cart.removeItem(productId);
+  const sanitizedProductId = sanitize.html(productId);
+  this.cart.removeItem(sanitizedProductId);
   this.updateDisplay();
 };

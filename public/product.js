@@ -15,44 +15,44 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         const categoriesList = document.querySelector('aside ul');
         categoriesList.innerHTML = categories.map(category => `
-            <li><a href="/?category=${category.catid}">${category.name}</a></li>
+            <li><a href="/?category=${sanitize.attribute(category.catid)}">${sanitize.html(category.name)}</a></li>
         `).join('');
 
         // Fetch product details
-        const productResponse = await fetch(`${BASE_URL}/api/products/${productId}`);
+        const productResponse = await fetch(`${BASE_URL}/api/products/${encodeURIComponent(productId)}`);
         if (!productResponse.ok) {
             throw new Error('Product not found');
         }
         
         const product = await productResponse.json();
         
-        // Update page title
-        document.title = `${product.name} - Dummy Shopping`;
+        // Update page title - Sanitize product name
+        document.title = `${sanitize.html(product.name)} - Dummy Shopping`;
 
-        // Update breadcrumb using category_name from API
+        // Update breadcrumb using category_name from API - Sanitize all values
         const breadcrumb = document.querySelector('.breadcrumb');
         breadcrumb.innerHTML = `
             <a href="/">Home</a>
             <span class="separator"> > </span>
-            <a href="/?category=${product.catid}">${product.category_name}</a>
+            <a href="/?category=${sanitize.attribute(product.catid)}">${sanitize.html(product.category_name)}</a>
             <span class="separator"> > </span>
-            <span>${product.name}</span>
+            <span>${sanitize.html(product.name)}</span>
         `;
 
-        // Display product details
+        // Display product details - Sanitize all values
         const productDetails = document.querySelector('.product-details');
         productDetails.innerHTML = `
             <div class="product-image">
                 <img src="${product.image ? 
-                    `${BASE_URL}/uploads/${product.image}` : 
+                    sanitize.url(`${BASE_URL}/uploads/${product.image}`) : 
                     'images/default.jpg'}" 
-                    alt="${product.name}">
+                    alt="${sanitize.attribute(product.name)}">
             </div>
             <div class="product-info">
-                <h1>${product.name}</h1>
-                <p class="category">Category: ${product.category_name}</p>
-                <p class="price">$${Number(product.price).toFixed(2)}</p>
-                <p class="description">${product.description}</p>
+                <h1>${sanitize.html(product.name)}</h1>
+                <p class="category">Category: ${sanitize.html(product.category_name)}</p>
+                <p class="price">$${sanitize.html(Number(product.price).toFixed(2))}</p>
+                <p class="description">${sanitize.html(product.description)}</p>
                 <div class="purchase-controls">
                     <div class="quantity-control">
                         <input type="number" 
@@ -64,7 +64,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                onkeypress="return event.charCode >= 48 && event.charCode <= 57">
                         <div class="quantity-error"></div>
                     </div>
-                    <button onclick="addToCart(${product.pid}, document.getElementById('quantity').value)">
+                    <button onclick="addToCart(${sanitize.html(product.pid)}, document.getElementById('quantity').value)">
                         Add to Cart
                     </button>
                 </div>
