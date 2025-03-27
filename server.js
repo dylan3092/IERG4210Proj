@@ -8,7 +8,7 @@ const xss = require('xss');
 const crypto = require('crypto');
 const cookieParser = require('cookie-parser');
 const session = require('express-session');
-const bcrypt = require('bcrypt'); // For password hashing
+const bcrypt = require('bcryptjs'); // Changed from bcrypt to bcryptjs
 
 const app = express();
 
