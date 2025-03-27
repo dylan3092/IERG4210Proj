@@ -2,13 +2,15 @@ const express = require('express');
 const mysql = require('mysql2/promise');
 const multer = require('multer');
 const path = require('path');
-const fs = require('fs/promises');
+const fs = require('fs');
 const sharp = require('sharp');
 const xss = require('xss');
 const crypto = require('crypto');
 const cookieParser = require('cookie-parser');
 const session = require('express-session');
 const bcrypt = require('bcryptjs'); // Changed from bcrypt to bcryptjs
+const cors = require('cors');
+const https = require('https'); // Also import https at the top
 
 const app = express();
 
@@ -433,6 +435,15 @@ app.use((req, res, next) => {
 });
 
 // Add CORS middleware first - before any CSRF or validation middleware
+app.use((req, res, next) => {
+    // Check if request is HTTP and not localhost
+    if (req.headers['x-forwarded-proto'] !== 'https' && req.hostname !== 'localhost' && req.hostname !== '127.0.0.1') {
+        // Redirect to HTTPS with same host and URL
+        return res.redirect(301, `https://${req.headers.host}${req.url}`);
+    }
+    next();
+});
+
 app.use((req, res, next) => {
     // Set the specific origin instead of wildcard for credentials to work
     const origin = req.headers.origin;
@@ -913,7 +924,7 @@ async function processImage(originalPath, filename) {
         .toFile(thumbnailPath);
 
     // Delete original uploaded file
-    await fs.unlink(originalPath);
+    await fs.promises.unlink(originalPath);
 
     return {
         full: `${baseFilename}_full${ext}`,
@@ -978,11 +989,11 @@ app.put('/api/products/:id', authUtils.authorizeAdmin, upload.single('image'), a
             );
 
             if (oldProduct[0].image) {
-                await fs.unlink(path.join('./uploads', oldProduct[0].image))
+                await fs.promises.unlink(path.join('./uploads', oldProduct[0].image))
                     .catch(() => {});
             }
             if (oldProduct[0].thumbnail) {
-                await fs.unlink(path.join('./uploads', oldProduct[0].thumbnail))
+                await fs.promises.unlink(path.join('./uploads', oldProduct[0].thumbnail))
                     .catch(() => {});
             }
 
@@ -1022,7 +1033,7 @@ app.delete('/api/products/:id', authUtils.authorizeAdmin, async (req, res) => {
         // Delete associated image
         const [oldProduct] = await pool.query('SELECT image FROM products WHERE pid = ?', [req.params.id]);
         if (oldProduct[0].image) {
-            await fs.unlink(path.join('./uploads', oldProduct[0].image)).catch(() => {});
+            await fs.promises.unlink(path.join('./uploads', oldProduct[0].image)).catch(() => {});
         }
 
         await pool.query('DELETE FROM products WHERE pid = ?', [req.params.id]);
@@ -1417,15 +1428,20 @@ const server = app.listen(httpPort, () => {
     console.log(`Try opening http://localhost:${httpPort} in your browser`);
 });
 
-// Add HTTPS support using Let's Encrypt certificates
-const https = require('https');
-
 // Check if SSL certificates exist before trying to create HTTPS server
 try {
+    // Check if certificate files exist
+    const certPath = '/etc/letsencrypt/live/s15.ierg4210.ie.cuhk.edu.hk/fullchain.pem';
+    const keyPath = '/etc/letsencrypt/live/s15.ierg4210.ie.cuhk.edu.hk/privkey.pem';
+    
+    if (!fs.existsSync(certPath) || !fs.existsSync(keyPath)) {
+        throw new Error(`Certificate files not found at ${certPath} or ${keyPath}`);
+    }
+    
     // Path to Let's Encrypt certificates
     const sslOptions = {
-        key: fs.readFileSync('/etc/letsencrypt/live/s15.ierg4210.ie.cuhk.edu.hk/privkey.pem'),
-        cert: fs.readFileSync('/etc/letsencrypt/live/s15.ierg4210.ie.cuhk.edu.hk/fullchain.pem')
+        key: fs.readFileSync(keyPath),
+        cert: fs.readFileSync(certPath)
     };
 
     // Create HTTPS server
@@ -1442,14 +1458,4 @@ try {
     console.log('SSL certificates not found or permission issue. Running in HTTP mode only.');
     console.log('To enable HTTPS, install Let\'s Encrypt certificates and restart the server.');
     console.log('Error details:', error.message);
-}
-
-// Add middleware to redirect HTTP to HTTPS in production
-app.use((req, res, next) => {
-    // Check if request is HTTP and not localhost
-    if (!req.secure && req.hostname !== 'localhost' && req.hostname !== '127.0.0.1') {
-        // Redirect to HTTPS with same host and URL
-        return res.redirect(`https://${req.headers.host}${req.url}`);
-    }
-    next();
-}); 
+} 
