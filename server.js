@@ -198,44 +198,123 @@ const authUtils = {
     }
 };
 
+// Generate a strong, persistent secret for the session
+const getOrCreateSessionSecret = () => {
+    // Try to get from environment variable first (most secure option)
+    if (process.env.SESSION_SECRET && process.env.SESSION_SECRET.length >= 32) {
+        return process.env.SESSION_SECRET;
+    }
+    
+    // Generate a cryptographically secure random secret
+    // This will change on server restart, but that's better than a weak secret
+    console.log('WARNING: No SESSION_SECRET environment variable set. Generating a random one.');
+    console.log('This will invalidate all sessions when the server restarts.');
+    console.log('For production, set a strong SESSION_SECRET environment variable.');
+    
+    // Use crypto.randomBytes for cryptographically secure randomness
+    return crypto.randomBytes(64).toString('hex');
+};
+
+// Get or create a session secret
+const SESSION_SECRET = getOrCreateSessionSecret();
+
 // Session configuration
 app.use(session({
-    secret: crypto.randomBytes(32).toString('hex'),
+    secret: SESSION_SECRET,
     resave: false,
     saveUninitialized: false, // Don't create session until something stored
-    name: 'neon_session', // Custom cookie name
+    name: 'neon_session', // Custom cookie name - not using a default predictable name
     cookie: {
         secure: true, // Always use secure cookies
         httpOnly: true,
         sameSite: 'strict', // Helps prevent CSRF - additional protection
         maxAge: 3 * 24 * 60 * 60 * 1000 // 3 days as per requirements
+    },
+    // Add custom session ID generation for maximum security
+    genid: (req) => {
+        // Generate a truly random session ID using crypto
+        return crypto.randomBytes(32).toString('hex');
     }
 }));
 
+// Generate a strong, persistent secret for CSRF protection
+const getOrCreateCsrfSecret = () => {
+    // Try to get from environment variable first (most secure option)
+    if (process.env.CSRF_SECRET && process.env.CSRF_SECRET.length >= 32) {
+        return process.env.CSRF_SECRET;
+    }
+    
+    // Generate a cryptographically secure random secret
+    console.log('WARNING: No CSRF_SECRET environment variable set. Generating a random one.');
+    console.log('This will invalidate all CSRF tokens when the server restarts.');
+    console.log('For production, set a strong CSRF_SECRET environment variable.');
+    
+    // Use crypto.randomBytes for cryptographically secure randomness
+    return crypto.randomBytes(64).toString('hex');
+};
+
+// Get or create a CSRF secret
+const CSRF_SECRET = getOrCreateCsrfSecret();
+
 // CSRF Protection Middleware
 const csrfProtection = {
-    // Generate a CSRF token based on session ID and a secret
+    // Generate a CSRF token based on multiple entropy sources
     generateToken: (req) => {
         if (!req.session) {
             throw new Error('Session middleware required');
         }
         
+        // Get sources of entropy
         const sessionId = req.session.id;
-        // Create a HMAC using the session ID and a secret key
-        const hmac = crypto.createHmac('sha256', process.env.CSRF_SECRET || 'csrf-secret-key');
-        hmac.update(sessionId);
-        return hmac.digest('hex');
+        const timestamp = Date.now().toString();
+        
+        // Create data to hash - must match verification method
+        const dataToHash = `${sessionId}:${timestamp}`;
+        
+        // Create a HMAC using the session ID and timestamp
+        const hmac = crypto.createHmac('sha256', CSRF_SECRET);
+        hmac.update(dataToHash);
+        
+        // Final token with timestamp component for expiration checks
+        return `${hmac.digest('hex')}.${timestamp}`;
     },
     
     // Verify that the token is valid
     verifyToken: (req, token) => {
         if (!token) return false;
-        const expectedToken = csrfProtection.generateToken(req);
-        // Use timing-safe comparison to prevent timing attacks
-        return crypto.timingSafeEqual(
-            Buffer.from(token),
-            Buffer.from(expectedToken)
-        );
+        
+        try {
+            // Split token to get timestamp and hash portions
+            const [hash, timestamp] = token.split('.');
+            
+            // Bail if token format is incorrect
+            if (!hash || !timestamp) return false;
+            
+            // Optional: Check if token is too old (e.g., more than 4 hours)
+            const tokenAge = Date.now() - parseInt(timestamp, 10);
+            if (tokenAge > 4 * 60 * 60 * 1000) { // 4 hours
+                console.log('CSRF token expired');
+                return false;
+            }
+            
+            // Reconstruct expected hash using session ID and timestamp
+            const sessionId = req.session.id;
+            const dataToHash = `${sessionId}:${timestamp}`;
+            
+            const hmac = crypto.createHmac('sha256', CSRF_SECRET);
+            hmac.update(dataToHash);
+            
+            const expectedHash = hmac.digest('hex');
+            
+            // Compare using timing-safe method to prevent timing attacks
+            return crypto.timingSafeEqual(
+                Buffer.from(hash),
+                Buffer.from(expectedHash)
+            );
+        } catch (error) {
+            console.error('CSRF token validation error:', error);
+            return false;
+        }
     },
     
     // Middleware to inject CSRF token into res.locals
@@ -465,7 +544,7 @@ const sanitizeInput = (req, res, next) => {
 // Apply sanitization middleware to all routes
 app.use(sanitizeInput);
 
-// Function to rotate session after successful login
+// Function to rotate session after successful login with enhanced security
 const rotateSession = (req, originalData) => {
     return new Promise((resolve, reject) => {
         // Save the important session data before regeneration
@@ -473,11 +552,15 @@ const rotateSession = (req, originalData) => {
             userId: originalData.userId || null,
             userEmail: originalData.userEmail || null,
             is_admin: originalData.is_admin || false,
-            isAuthenticated: originalData.isAuthenticated || false
+            isAuthenticated: originalData.isAuthenticated || false,
+            // Add a login timestamp for potential inactivity checks
+            loginTimestamp: Date.now()
         };
         
-        // Generate new session ID
+        // Record the old session ID for security logs
         const oldSessionId = req.session.id;
+        
+        // Generate a completely new session with a new ID
         req.session.regenerate((err) => {
             if (err) {
                 console.error('Session rotation failed:', err);
@@ -489,8 +572,16 @@ const rotateSession = (req, originalData) => {
             req.session.userEmail = userData.userEmail;
             req.session.is_admin = userData.is_admin;
             req.session.isAuthenticated = userData.isAuthenticated;
+            req.session.loginTimestamp = userData.loginTimestamp;
             
-            console.log(`Session rotated: ${oldSessionId} → ${req.session.id}`);
+            // Add additional security measures
+            req.session.userAgent = req.headers['user-agent'];
+            req.session.ipAddress = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+            
+            // Generate a unique token for this session (additional security)
+            req.session.uniqueToken = crypto.randomBytes(32).toString('hex');
+            
+            console.log(`Session rotated with enhanced security: ${oldSessionId} → ${req.session.id}`);
             resolve();
         });
     });
@@ -552,6 +643,13 @@ const upload = multer({
     }
 });
 
+// Generate a cryptographically secure CSP nonce
+const generateSecureNonce = () => {
+    // Use 16 bytes (128 bits) of randomness for the nonce
+    // This provides enough entropy to make nonces unguessable
+    return crypto.randomBytes(16).toString('base64');
+};
+
 // Add this near the top, after creating the app
 app.use((req, res, next) => {
     // Set the specific origin instead of wildcard for credentials to work
@@ -576,7 +674,7 @@ app.use((req, res, next) => {
     }
     
     // Generate a random nonce for this request
-    const nonce = crypto.randomBytes(16).toString('base64');
+    const nonce = generateSecureNonce();
     
     // Add Content Security Policy header
     // This is a strict policy that helps prevent XSS attacks
@@ -960,45 +1058,70 @@ app.post('/api/csp-report', express.json({ type: 'application/reports+json' }), 
     res.status(204).end();
 });
 
-// Add a simple login route with CSRF protection
-app.get('/api/login-form', (req, res) => {
-    // Generate a login-specific nonce for this request
-    const loginNonce = crypto.randomBytes(16).toString('base64');
+// Function to generate a secure login nonce
+const generateLoginNonce = () => {
+    return crypto.randomBytes(32).toString('hex');
+};
+
+// Route to get a login nonce - can be called before attempting login
+app.get('/api/login-nonce', (req, res) => {
+    // Generate a secure random nonce for this login attempt
+    const loginNonce = generateLoginNonce();
     
-    // Store the nonce in session for validation
-    req.session.loginNonce = loginNonce;
+    // Store the nonce in the session with an expiration time
+    // Even unauthenticated users can have session for CSRF protection
+    if (!req.session.loginNonces) {
+        req.session.loginNonces = [];
+    }
     
-    // Return the login form
-    res.send(`
-        <form method="POST" action="/api/login">
-            <h2>Admin Login</h2>
-            <div>
-                <label for="username">Username:</label>
-                <input type="text" id="username" name="username" required>
-            </div>
-            <div>
-                <label for="password">Password:</label>
-                <input type="password" id="password" name="password" required>
-            </div>
-            
-            <!-- CSRF Protection -->
-            <input type="hidden" name="_csrf" value="${res.locals.csrfToken}">
-            
-            <!-- Double CSRF protection for login - prevents login CSRF -->
-            <input type="hidden" name="loginNonce" value="${loginNonce}">
-            
-            <button type="submit">Login</button>
-        </form>
-    `);
+    // Keep a limited number of valid nonces with timestamps
+    // This allows multiple login attempts while preventing nonce reuse
+    req.session.loginNonces.push({
+        nonce: loginNonce,
+        created: Date.now(),
+        used: false
+    });
+    
+    // Keep only the 5 most recent nonces to prevent session bloat
+    if (req.session.loginNonces.length > 5) {
+        req.session.loginNonces.shift(); // Remove oldest
+    }
+    
+    res.json({ nonce: loginNonce });
 });
 
-// Login endpoint
+// Login endpoint with enhanced security
 app.post('/api/login', async (req, res) => {
     try {
         console.log('Login attempt received:', req.body.email);
-        const { email, password } = req.body;
+        const { email, password, loginNonce } = req.body;
+        
         if (!email || !password) {
             return res.status(400).json({ error: 'Email and password are required' });
+        }
+
+        // Verify login nonce to prevent login CSRF attacks
+        let validNonce = false;
+        
+        if (req.session.loginNonces && loginNonce) {
+            // Find the nonce in the session
+            const nonceIndex = req.session.loginNonces.findIndex(n => 
+                n.nonce === loginNonce && !n.used && 
+                (Date.now() - n.created) < 15 * 60 * 1000 // 15 minutes max age
+            );
+            
+            if (nonceIndex >= 0) {
+                // Mark the nonce as used
+                req.session.loginNonces[nonceIndex].used = true;
+                validNonce = true;
+            }
+        }
+        
+        // Only require nonce in production for better security
+        if (process.env.NODE_ENV === 'production' && !validNonce) {
+            console.warn('Invalid or missing login nonce - possible CSRF attack from:', 
+                req.headers['x-forwarded-for'] || req.connection.remoteAddress);
+            return res.status(403).json({ error: 'Invalid login nonce', requireNonce: true });
         }
 
         // Use pool query instead of getDB
@@ -1193,6 +1316,52 @@ app.use((req, res, next) => {
             req.session.touch();
         }
     }
+    
+    next();
+});
+
+// Enhanced session validation middleware
+app.use((req, res, next) => {
+    // Skip for unauthenticated requests
+    if (!req.session || !req.session.isAuthenticated) {
+        return next();
+    }
+    
+    // Check if session contains the necessary security information
+    if (!req.session.uniqueToken || !req.session.userAgent || !req.session.ipAddress) {
+        console.warn('Session missing security tokens - possible session hijacking attempt');
+        req.session.destroy();
+        return res.status(403).redirect('/login.html?error=session_invalid');
+    }
+    
+    // Validate the user agent hasn't changed (prevents certain session hijacking attacks)
+    const currentUserAgent = req.headers['user-agent'];
+    if (req.session.userAgent !== currentUserAgent) {
+        console.warn('User agent mismatch - possible session hijacking attempt');
+        console.warn(`Stored: ${req.session.userAgent}`);
+        console.warn(`Current: ${currentUserAgent}`);
+        req.session.destroy();
+        return res.status(403).redirect('/login.html?error=session_invalid');
+    }
+    
+    // Check IP address for significant changes (optional, can cause false positives)
+    const currentIp = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+    // Only log for now, don't enforce, as legitimate IP changes can happen (mobile users, etc.)
+    if (req.session.ipAddress !== currentIp) {
+        console.warn(`IP address changed for user ${req.session.userEmail}: ${req.session.ipAddress} -> ${currentIp}`);
+    }
+    
+    // Check for session expiration based on inactivity (optional)
+    const inactivityPeriod = 60 * 60 * 1000; // 1 hour inactivity timeout
+    
+    if (req.session.lastActivity && (Date.now() - req.session.lastActivity > inactivityPeriod)) {
+        console.log(`Session expired due to inactivity for user ${req.session.userEmail}`);
+        req.session.destroy();
+        return res.status(403).redirect('/login.html?error=session_expired');
+    }
+    
+    // Update last activity timestamp
+    req.session.lastActivity = Date.now();
     
     next();
 });
