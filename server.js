@@ -1381,28 +1381,6 @@ app.use((req, res, next) => {
     next();
 });
 
-// Add a catch-all route handler for 404 errors
-app.use((req, res, next) => {
-    // API routes should return JSON
-    if (req.path.startsWith('/api/')) {
-        return res.status(404).json({ error: 'API endpoint not found' });
-    }
-    
-    // For GET requests to HTML pages, serve a custom 404 page
-    if (req.method === 'GET' && (req.accepts('html') || req.path.endsWith('.html'))) {
-        return res.status(404).sendFile(path.join(__dirname, 'public', '404.html'));
-    }
-    
-    // Default 404 handler
-    res.status(404).send('404 - Not Found');
-});
-
-// Error handling middleware
-app.use((err, req, res, next) => {
-    console.error(err.stack);
-    res.status(500).json({ error: err.message });
-});
-
 // API endpoint to check authentication status
 app.get('/api/auth/status', (req, res) => {
     if (authUtils.isAuthenticated(req)) {
@@ -1423,6 +1401,28 @@ app.get('/api/auth/status', (req, res) => {
             authenticated: false
         });
     }
+});
+
+// Add a catch-all route handler for 404 errors
+app.use((req, res, next) => {
+    // API routes should return JSON
+    if (req.path.startsWith('/api/')) {
+        return res.status(404).json({ error: 'API endpoint not found' });
+    }
+    
+    // For GET requests to HTML pages, serve a custom 404 page
+    if (req.method === 'GET' && (req.accepts('html') || req.path.endsWith('.html'))) {
+        return res.status(404).sendFile(path.join(__dirname, 'public', '404.html'));
+    }
+    
+    // Default 404 handler
+    res.status(404).send('404 - Not Found');
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(500).json({ error: err.message });
 });
 
 // Existing HTTP server code - keep this for redirection
