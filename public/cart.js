@@ -93,7 +93,7 @@ class ShoppingCart {
             }
             
             quantity = parseInt(quantity);
-            if (isNaN(quantity) || quantity < 1 || quantity > 100) {
+            if (isNaN(quantity) || quantity < 1 || quantity > 2147483646) {
                 console.error('Invalid quantity value');
                 this.isLoading = false;
                 return;
@@ -304,9 +304,15 @@ class CartUIController {
 
     // Show added to cart feedback
     showAddedFeedback() {
+        // Remove any existing notifications first
+        const existingNotifications = document.querySelectorAll('.notification');
+        existingNotifications.forEach(node => node.remove());
+        
+        // Create new notification
         const feedback = document.createElement('div');
         feedback.className = 'notification';
         feedback.textContent = 'Added to cart!';
+        feedback.style.backgroundColor = '#4CAF50'; // Ensure green background
         document.body.appendChild(feedback);
         
         // Remove the feedback after animation completes

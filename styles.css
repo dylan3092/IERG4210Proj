@@ -509,17 +509,18 @@ button[type="submit"]:disabled {
 /* Notification styles */
 .notification {
     position: fixed;
-    top: 20px;
-    left: 20px;
-    background-color: #4CAF50;
+    top: 120px; /* Position below breadcrumb */
+    left: 20px; /* Align with Categories sidebar */
+    background-color: #4CAF50; /* Ensure green background */
     color: white;
     padding: 15px 25px;
     border-radius: 4px;
     box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-    z-index: 1000;
+    z-index: 999; /* Below cart but above other content */
     animation: slideInFromLeft 0.3s ease-out;
-    max-width: 300px;
+    max-width: 250px;
     text-align: center;
+    font-weight: bold;
 }
 
 /* Ensure cart stays on top */

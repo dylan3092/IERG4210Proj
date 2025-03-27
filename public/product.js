@@ -128,15 +128,20 @@ function addToCart(productId, quantity) {
     const quantityInput = document.getElementById('quantity');
     if (!quantityInput) return;
     
+    // Get the quantity control container
+    const errorDiv = quantityInput.parentElement.querySelector('.quantity-error');
+    
     // Validate input value first
     const inputValue = quantityInput.value.trim();
     
     // Check if input is empty or contains non-numeric characters
     if (inputValue === '' || !/^\d+$/.test(inputValue)) {
-        const errorDiv = quantityInput.parentElement.querySelector('.quantity-error');
+        // Apply error styling
         quantityInput.classList.add('shop-error');
         if (errorDiv) {
             errorDiv.textContent = 'Quantity must be a valid number';
+            errorDiv.classList.add('shop-error-message');
+            errorDiv.style.display = 'block';
         }
         return; // Stop execution - don't add to cart
     }
@@ -146,14 +151,23 @@ function addToCart(productId, quantity) {
     
     // Check range
     if (numericValue < 1 || numericValue > 100) {
-        const errorDiv = quantityInput.parentElement.querySelector('.quantity-error');
+        // Apply error styling
         quantityInput.classList.add('shop-error');
         if (errorDiv) {
             errorDiv.textContent = numericValue < 1 ? 
                 'Quantity must be at least 1' : 
                 'Maximum quantity is 100';
+            errorDiv.classList.add('shop-error-message');
+            errorDiv.style.display = 'block';
         }
         return; // Stop execution - don't add to cart
+    }
+    
+    // Reset error state if input is valid
+    quantityInput.classList.remove('shop-error');
+    if (errorDiv) {
+        errorDiv.textContent = '';
+        errorDiv.style.display = 'none';
     }
     
     // If we get here, the input is valid - add to cart
