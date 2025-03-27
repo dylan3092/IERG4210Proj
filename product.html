@@ -74,7 +74,7 @@
 
   <script>
     // Define the base URL
-    const BASE_URL = 'http://s15.ierg4210.ie.cuhk.edu.hk:3000';
+    const BASE_URL = '/api';
     
     // Check if user is logged in
     document.addEventListener('DOMContentLoaded', () => {
@@ -101,7 +101,7 @@
           e.preventDefault();
           
           try {
-            const response = await fetch(`${BASE_URL}/api/logout`, {
+            const response = await fetch(`${BASE_URL}/logout`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',

@@ -45,7 +45,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 // Load categories once and cache them
 async function loadCategories() {
     try {
-        const response = await fetch(`${BASE_URL}/api/categories`);
+        const response = await fetch(`${BASE_URL}/categories`);
         
         if (!response.ok) {
             console.error('Failed to load categories:', response.status, response.statusText);
@@ -130,8 +130,8 @@ async function homeHandler(params) {
     try {
         // Fetch products based on category
         const productsUrl = categoryId 
-            ? `${BASE_URL}/api/products?category=${sanitize.html(categoryId)}`
-            : `${BASE_URL}/api/products`;
+            ? `${BASE_URL}/products?category=${sanitize.html(categoryId)}`
+            : `${BASE_URL}/products`;
             
         console.log(`Fetching products from: ${productsUrl}`);
         
@@ -190,7 +190,7 @@ async function homeHandler(params) {
                 <article class="product-item">
                     <a href="product.html?product=${sanitize.attribute(product.pid)}">
                         <img src="${product.thumbnail ? 
-                            sanitize.url(`${BASE_URL}/uploads/${product.thumbnail}`) : 
+                            sanitize.url(`/uploads/${product.thumbnail}`) : 
                             'images/default.jpg'}" 
                             alt="${sanitize.html(product.name)}" width="150" height="150">
                         <h3>${sanitize.html(product.name)}</h3>
@@ -219,7 +219,7 @@ async function productHandler(params) {
     
     try {
         // Fetch product details
-        const productResponse = await fetch(`${BASE_URL}/api/products/${sanitize.html(productId)}`);
+        const productResponse = await fetch(`${BASE_URL}/products/${sanitize.html(productId)}`);
         if (!productResponse.ok) {
             throw new Error('Product not found');
         }
@@ -240,7 +240,7 @@ async function productHandler(params) {
             <div class="product-details">
                 <div class="product-image">
                     <img src="${product.image ? 
-                        sanitize.url(`${BASE_URL}/uploads/${product.image}`) : 
+                        sanitize.url(`/uploads/${product.image}`) : 
                         'images/default.jpg'}" 
                         alt="${sanitize.html(product.name)}">
                 </div>
