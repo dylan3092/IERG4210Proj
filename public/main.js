@@ -72,7 +72,7 @@ function renderCategories() {
             const isActive = currentCategoryId == category.catid;
             return `
                 <li>
-                    <a href="/?category=${sanitize.attribute(category.catid)}" 
+                    <a href="index.html?category=${sanitize.attribute(category.catid)}" 
                        class="${isActive ? 'active' : ''}">
                         ${sanitize.html(category.name)}
                     </a>

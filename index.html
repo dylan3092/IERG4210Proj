@@ -69,7 +69,7 @@
 
   <!-- Add these scripts right before closing body tag -->
   <script>
-    const BASE_URL = '';
+    const BASE_URL = 'http://s15.ierg4210.ie.cuhk.edu.hk:3000';
     
     // Check if user is logged in
     document.addEventListener('DOMContentLoaded', () => {
@@ -121,14 +121,14 @@
     });
   </script>
   <!-- Load sanitization utilities first -->
-  <script src="js/sanitize.js"></script>
+  <script src="public/js/sanitize.js"></script>
   <!-- Load shop validation -->
-  <script src="js/shop-validation.js"></script>
+  <script src="public/js/shop-validation.js"></script>
   <!-- Load router -->
-  <script src="router.js"></script>
+  <script src="public/router.js"></script>
   <!-- Load cart -->
-  <script src="cart.js"></script>
+  <script src="public/cart.js"></script>
   <!-- Finally load main.js which depends on both -->
-  <script src="main.js"></script>
+  <script src="public/main.js"></script>
 </body>
 </html>
