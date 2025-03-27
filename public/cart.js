@@ -294,14 +294,14 @@ class CartUIController {
     // Show added to cart feedback
     showAddedFeedback() {
         const feedback = document.createElement('div');
-        feedback.className = 'add-to-cart-feedback';
+        feedback.className = 'notification';
         feedback.textContent = 'Added to cart!';
         document.body.appendChild(feedback);
         
         // Remove the feedback after animation completes
         setTimeout(() => {
             feedback.style.opacity = '0';
-            feedback.style.transform = 'translateY(-20px) translateX(-50%)';
+            feedback.style.transform = 'translateX(100%)';
             feedback.style.transition = 'opacity 0.3s, transform 0.3s';
             
             setTimeout(() => {

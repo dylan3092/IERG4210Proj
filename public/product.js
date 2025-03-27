@@ -124,11 +124,40 @@ function validateQuantity(input) {
 
 // Function to add item to cart with validation
 function addToCart(productId, quantity) {
+    // Get the input element directly
     const quantityInput = document.getElementById('quantity');
-    const validatedQuantity = validateQuantity(quantityInput);
+    if (!quantityInput) return;
     
-    if (validatedQuantity && validatedQuantity >= 1 && validatedQuantity <= 100) {
-        // Add to cart with validated quantity
-        cart.addItem(productId, validatedQuantity);
+    // Validate input value first
+    const inputValue = quantityInput.value.trim();
+    
+    // Check if input is empty or contains non-numeric characters
+    if (inputValue === '' || !/^\d+$/.test(inputValue)) {
+        const errorDiv = quantityInput.parentElement.querySelector('.quantity-error');
+        quantityInput.classList.add('shop-error');
+        if (errorDiv) {
+            errorDiv.textContent = 'Quantity must be a valid number';
+        }
+        return; // Stop execution - don't add to cart
+    }
+    
+    // Parse the value
+    const numericValue = parseInt(inputValue, 10);
+    
+    // Check range
+    if (numericValue < 1 || numericValue > 100) {
+        const errorDiv = quantityInput.parentElement.querySelector('.quantity-error');
+        quantityInput.classList.add('shop-error');
+        if (errorDiv) {
+            errorDiv.textContent = numericValue < 1 ? 
+                'Quantity must be at least 1' : 
+                'Maximum quantity is 100';
+        }
+        return; // Stop execution - don't add to cart
+    }
+    
+    // If we get here, the input is valid - add to cart
+    if (typeof cart !== 'undefined' && typeof cart.addItem === 'function') {
+        cart.addItem(productId, numericValue);
     }
 } 
