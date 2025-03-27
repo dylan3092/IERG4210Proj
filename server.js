@@ -361,8 +361,11 @@ app.use('/js', express.static('public/js'));
 app.use((req, res, next) => {
     // Set the specific origin instead of wildcard for credentials to work
     const origin = req.headers.origin;
-    if (origin && (origin === 'http://s15.ierg4210.ie.cuhk.edu.hk' || origin.startsWith('http://localhost'))) {
+    
+    // Allow requests from both the main site and with port 3000
+    if (origin) {
         res.header('Access-Control-Allow-Origin', origin);
+        console.log(`Accepting request from origin: ${origin}`);
     }
     
     // Allow credentials (cookies, authorization headers, etc)
@@ -372,7 +375,9 @@ app.use((req, res, next) => {
     
     // Handle preflight requests
     if (req.method === 'OPTIONS') {
-        return res.status(200).end();
+        console.log('Handling OPTIONS preflight request');
+        res.status(200).end();
+        return;
     }
     
     // Generate a random nonce for this request
@@ -409,8 +414,8 @@ app.use((req, res, next) => {
     ];
     
     // Set CSP header - use report-only first to test before enforcing
-    // Comment this line and uncomment the next one when you're ready to enforce
-    res.header('Content-Security-Policy-Report-Only', cspDirectives.join('; '));
+    // Comment out for now as it may interfere with CORS
+    // res.header('Content-Security-Policy-Report-Only', cspDirectives.join('; '));
     // res.header('Content-Security-Policy', cspDirectives.join('; '));
     
     // Make nonce available to templates if needed
