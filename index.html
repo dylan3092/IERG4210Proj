@@ -69,7 +69,7 @@
 
   <!-- Add these scripts right before closing body tag -->
   <script>
-    const BASE_URL = '';
+    const BASE_URL = 'http://s15.ierg4210.ie.cuhk.edu.hk:3000';
     
     // Check if user is logged in
     document.addEventListener('DOMContentLoaded', () => {
@@ -96,7 +96,7 @@
           e.preventDefault();
           
           try {
-            const response = await fetch('/api/logout', {
+            const response = await fetch(`${BASE_URL}/api/logout`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',

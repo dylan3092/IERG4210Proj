@@ -1,8 +1,8 @@
 // API endpoints
 const API = {
-    categories: '/api/categories',
-    products: '/api/products',
-    csrfToken: '/api/csrf-token' // New endpoint for CSRF token
+    categories: `${BASE_URL}/api/categories`,
+    products: `${BASE_URL}/api/products`,
+    csrfToken: `${BASE_URL}/api/csrf-token` // New endpoint for CSRF token
 };
 
 // CSRF token management
@@ -261,7 +261,7 @@ document.getElementById('product-form').addEventListener('submit', handleProduct
 // Handle user logout
 const handleLogout = async () => {
     try {
-        const response = await safeFetch('/api/logout', {
+        const response = await safeFetch(`${BASE_URL}/api/logout`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -317,7 +317,7 @@ const setupUserActions = () => {
 (async () => {
     try {
         // Check if we're authenticated first
-        const checkAuth = await fetch('/api/categories');
+        const checkAuth = await fetch(`${BASE_URL}/api/categories`);
         if (!checkAuth.ok) {
             // If not authenticated, redirect to login
             window.location.href = '/login.html';

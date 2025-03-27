@@ -135,6 +135,9 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="public/admin.js"></script>
     <script>
+    // Add the BASE_URL constant
+    const BASE_URL = 'http://s15.ierg4210.ie.cuhk.edu.hk:3000';
+    
     // Add inline password change functionality
     document.addEventListener('DOMContentLoaded', () => {
         const passwordChangeForm = document.getElementById('password-change-form');
@@ -164,7 +167,7 @@
                 
                 try {
                     const csrfToken = sessionStorage.getItem('csrfToken');
-                    const response = await fetch('/api/change-password', {
+                    const response = await fetch(`${BASE_URL}/api/change-password`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
