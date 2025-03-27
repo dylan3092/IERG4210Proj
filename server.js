@@ -1447,11 +1447,11 @@ try {
 
     // Create HTTPS server
     const httpsServer = https.createServer(sslOptions, app);
-    const httpsPort = 443;
+    const httpsPort = 8443; // Changed from 443 to a non-privileged port
     
     httpsServer.listen(httpsPort, () => {
         console.log(`HTTPS Server running on port ${httpsPort}`);
-        console.log(`Try opening https://s15.ierg4210.ie.cuhk.edu.hk in your browser`);
+        console.log(`Try opening https://s15.ierg4210.ie.cuhk.edu.hk:${httpsPort} in your browser`);
     });
     
     console.log('SSL enabled with Let\'s Encrypt certificates');
