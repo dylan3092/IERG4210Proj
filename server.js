@@ -349,15 +349,28 @@ const upload = multer({
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static('public'));
+app.use(express.static(__dirname)); // Serve files from the root directory
+app.use(express.static('public'));  // Serve files from the public directory
 app.use('/uploads', express.static('uploads'));
-app.use('/js', express.static('public/js'));  // Ensure public/js directory is properly served
+app.use('/js', express.static('public/js'));
 
 // Add this near the top, after creating the app
 app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', '*');  // Or specific domain
-    res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE');
-    res.header('Access-Control-Allow-Headers', 'Content-Type');
+    // Set the specific origin instead of wildcard for credentials to work
+    const origin = req.headers.origin;
+    if (origin && (origin === 'http://s15.ierg4210.ie.cuhk.edu.hk' || origin.startsWith('http://localhost'))) {
+        res.header('Access-Control-Allow-Origin', origin);
+    }
+    
+    // Allow credentials (cookies, authorization headers, etc)
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Methods', 'GET, PUT, POST, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, CSRF-Token, X-CSRF-Token');
+    
+    // Handle preflight requests
+    if (req.method === 'OPTIONS') {
+        return res.status(200).end();
+    }
     
     // Generate a random nonce for this request
     const nonce = crypto.randomBytes(16).toString('base64');
@@ -369,19 +382,19 @@ app.use((req, res, next) => {
         "default-src 'self'",
         // Scripts can be loaded from same origin and allow our external CDN
         // Also allow inline scripts with the generated nonce and unsafe-inline as a fallback
-        `script-src 'self' http://s15.ierg4210.ie.cuhk.edu.hk:3000 'nonce-${nonce}' 'unsafe-eval' 'unsafe-inline'`,
+        `script-src 'self' http://s15.ierg4210.ie.cuhk.edu.hk:3000 http://s15.ierg4210.ie.cuhk.edu.hk 'nonce-${nonce}' 'unsafe-eval' 'unsafe-inline'`,
         // Styles can be loaded from same origin and allow our external CDN and inline styles
-        "style-src 'self' http://s15.ierg4210.ie.cuhk.edu.hk:3000 'unsafe-inline'",
+        "style-src 'self' https://cdn.jsdelivr.net http://s15.ierg4210.ie.cuhk.edu.hk:3000 http://s15.ierg4210.ie.cuhk.edu.hk 'unsafe-inline'",
         // Images can be loaded from same origin and data URIs
-        "img-src 'self' data: http://s15.ierg4210.ie.cuhk.edu.hk:3000",
+        "img-src 'self' data: http://s15.ierg4210.ie.cuhk.edu.hk:3000 http://s15.ierg4210.ie.cuhk.edu.hk",
         // Forms can only submit to same origin
         "form-action 'self'",
         // Frames can only load from same origin
         "frame-src 'self'",
-        // Connect to only same origin
-        "connect-src 'self' http://s15.ierg4210.ie.cuhk.edu.hk:3000",
+        // Connect to only same origin and our API server
+        "connect-src 'self' http://s15.ierg4210.ie.cuhk.edu.hk:3000 http://s15.ierg4210.ie.cuhk.edu.hk",
         // Font sources
-        "font-src 'self' http://s15.ierg4210.ie.cuhk.edu.hk:3000",
+        "font-src 'self' https://cdn.jsdelivr.net http://s15.ierg4210.ie.cuhk.edu.hk:3000 http://s15.ierg4210.ie.cuhk.edu.hk",
         // Media sources
         "media-src 'self'",
         // Object sources (plugins, etc)
@@ -389,18 +402,13 @@ app.use((req, res, next) => {
         // Base URI restriction to prevent base tag hijacking
         "base-uri 'self'",
         // Upgrade insecure requests
-        "upgrade-insecure-requests",
-        // Report violations to this endpoint
-        "report-to csp-endpoint"
+        "upgrade-insecure-requests"
     ];
     
     // Set CSP header - use report-only first to test before enforcing
     // Comment this line and uncomment the next one when you're ready to enforce
     res.header('Content-Security-Policy-Report-Only', cspDirectives.join('; '));
     // res.header('Content-Security-Policy', cspDirectives.join('; '));
-    
-    // Set up CSP reporting
-    res.header('Reporting-Endpoints', 'csp-endpoint="/api/csp-report"');
     
     // Make nonce available to templates if needed
     res.locals.cspNonce = nonce;
@@ -870,6 +878,32 @@ app.post('/api/change-password', async (req, res) => {
         console.error('Change password error:', error);
         return res.status(500).json({ error: 'Internal server error' });
     }
+});
+
+// Add specific route for login page
+app.get('/login.html', (req, res) => {
+    res.sendFile(path.join(__dirname, 'login.html'));
+});
+
+// Add specific route for admin page
+app.get('/admin.html', (req, res) => {
+    res.sendFile(path.join(__dirname, 'admin.html'));
+});
+
+// Add a catch-all route handler for 404 errors
+app.use((req, res, next) => {
+    // API routes should return JSON
+    if (req.path.startsWith('/api/')) {
+        return res.status(404).json({ error: 'API endpoint not found' });
+    }
+    
+    // For GET requests to HTML pages, serve a custom 404 page
+    if (req.method === 'GET' && (req.accepts('html') || req.path.endsWith('.html'))) {
+        return res.status(404).sendFile(path.join(__dirname, 'public', '404.html'));
+    }
+    
+    // Default 404 handler
+    res.status(404).send('404 - Not Found');
 });
 
 // Error handling middleware
