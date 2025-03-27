@@ -98,12 +98,12 @@ const authUtils = {
     
     // Check if a user is authenticated
     isAuthenticated(req) {
-        return req.session && req.session.userId && req.session.isAuthenticated;
+        return req.session && req.session.userId && req.session.isAuthenticated === true;
     },
     
     // Check if a user is an admin
     isAdmin(req) {
-        return req.session && req.session.is_admin === true;
+        return authUtils.isAuthenticated(req) && req.session.is_admin === true;
     },
     
     // Authentication middleware
@@ -111,6 +111,10 @@ const authUtils = {
         if (authUtils.isAuthenticated(req)) {
             next();
         } else {
+            // Redirect to login page for HTML requests
+            if (req.accepts('html')) {
+                return res.redirect('/login.html');
+            }
             res.status(401).json({ error: 'Authentication required' });
         }
     },
@@ -120,6 +124,10 @@ const authUtils = {
         if (authUtils.isAuthenticated(req) && authUtils.isAdmin(req)) {
             next();
         } else {
+            // Redirect to login page for HTML requests
+            if (req.accepts('html')) {
+                return res.redirect('/login.html');
+            }
             res.status(403).json({ error: 'Admin privileges required' });
         }
     }
@@ -129,9 +137,10 @@ const authUtils = {
 app.use(session({
     secret: crypto.randomBytes(32).toString('hex'),
     resave: false,
-    saveUninitialized: true,
+    saveUninitialized: false, // Don't create session until something stored
+    name: 'neon_session', // Custom cookie name
     cookie: {
-        secure: process.env.NODE_ENV === 'production',
+        secure: true, // Always use secure cookies
         httpOnly: true,
         sameSite: 'strict', // Helps prevent CSRF - additional protection
         maxAge: 3 * 24 * 60 * 60 * 1000 // 3 days as per requirements
@@ -259,6 +268,26 @@ app.use(express.static('public'));  // Serve files from the public directory
 app.use('/uploads', express.static('uploads'));
 app.use('/js', express.static('public/js'));
 
+// Security headers middleware
+app.use((req, res, next) => {
+    // Prevent browsers from detecting MIME types incorrectly
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    
+    // Prevent clickjacking
+    res.setHeader('X-Frame-Options', 'DENY');
+    
+    // XSS protection
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    
+    // Referrer policy
+    res.setHeader('Referrer-Policy', 'same-origin');
+    
+    // HTTP Strict Transport Security (force HTTPS)
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    
+    next();
+});
+
 // Add CORS middleware first - before any CSRF or validation middleware
 app.use((req, res, next) => {
     // Set the specific origin instead of wildcard for credentials to work
@@ -370,6 +399,37 @@ const sanitizeInput = (req, res, next) => {
 
 // Apply sanitization middleware to all routes
 app.use(sanitizeInput);
+
+// Function to rotate session after successful login
+const rotateSession = (req, originalData) => {
+    return new Promise((resolve, reject) => {
+        // Save the important session data before regeneration
+        const userData = {
+            userId: originalData.userId || null,
+            userEmail: originalData.userEmail || null,
+            is_admin: originalData.is_admin || false,
+            isAuthenticated: originalData.isAuthenticated || false
+        };
+        
+        // Generate new session ID
+        const oldSessionId = req.session.id;
+        req.session.regenerate((err) => {
+            if (err) {
+                console.error('Session rotation failed:', err);
+                return reject(err);
+            }
+            
+            // Restore user data to new session
+            req.session.userId = userData.userId;
+            req.session.userEmail = userData.userEmail;
+            req.session.is_admin = userData.is_admin;
+            req.session.isAuthenticated = userData.isAuthenticated;
+            
+            console.log(`Session rotated: ${oldSessionId} → ${req.session.id}`);
+            resolve();
+        });
+    });
+};
 
 // Add this near the top of server.js
 const uploadDir = './uploads';
@@ -886,19 +946,30 @@ app.post('/api/login', async (req, res) => {
 
         console.log('User authenticated successfully:', email);
         
-        // Store user data in session for use in the client
-        req.session.userId = user.userid;
-        req.session.userEmail = user.email;
-        req.session.is_admin = user.is_admin === 1 || user.is_admin === true;
-        req.session.isAuthenticated = true;
+        // Store temporary user data
+        const sessionData = {
+            userId: user.userid,
+            userEmail: user.email,
+            is_admin: user.is_admin === 1 || user.is_admin === true,
+            isAuthenticated: true
+        };
         
-        return res.status(200).json({ 
-            success: true,
-            user: {
-                email: user.email,
-                isAdmin: req.session.is_admin
-            }
-        });
+        try {
+            // Rotate session to prevent session fixation attacks
+            await rotateSession(req, sessionData);
+            
+            // Return success response
+            return res.status(200).json({ 
+                success: true,
+                user: {
+                    email: user.email,
+                    isAdmin: sessionData.is_admin
+                }
+            });
+        } catch (sessionError) {
+            console.error('Error during session rotation:', sessionError);
+            return res.status(500).json({ error: 'Session error during login' });
+        }
     } catch (error) {
         console.error('Login error:', error);
         return res.status(500).json({ error: 'Internal server error' });
@@ -910,6 +981,13 @@ app.post('/api/logout', async (req, res) => {
     try {
         console.log('Logout attempt received');
         
+        if (!req.session || !req.session.isAuthenticated) {
+            return res.status(200).json({ success: true, message: 'Already logged out' });
+        }
+        
+        // Log who is logging out for audit purposes
+        console.log(`User logged out: ${req.session.userEmail} (ID: ${req.session.userId})`);
+        
         // Clear session data
         req.session.destroy((err) => {
             if (err) {
@@ -917,7 +995,14 @@ app.post('/api/logout', async (req, res) => {
                 return res.status(500).json({ error: 'Failed to logout' });
             }
             
-            res.clearCookie('connect.sid');
+            // Clear the session cookie by setting it to expire in the past
+            res.clearCookie('neon_session', {
+                path: '/',
+                httpOnly: true,
+                secure: true,
+                sameSite: 'strict'
+            });
+            
             console.log('User logged out successfully');
             res.status(200).json({ success: true });
         });
@@ -985,14 +1070,43 @@ app.get('/login.html', (req, res) => {
     res.sendFile(path.join(__dirname, 'login.html'));
 });
 
-// Add specific route for admin page
-app.get('/admin.html', (req, res) => {
+// Add specific route for admin page - protected with admin authorization
+app.get('/admin', authUtils.authorizeAdmin, (req, res) => {
     res.sendFile(path.join(__dirname, 'admin.html'));
 });
 
-// Serve admin page directly
-app.get('/admin', (req, res) => {
+app.get('/admin.html', authUtils.authorizeAdmin, (req, res) => {
     res.sendFile(path.join(__dirname, 'admin.html'));
+});
+
+// Add middleware to attach user info from session to res.locals
+app.use((req, res, next) => {
+    // Check if the user is authenticated
+    res.locals.isAuthenticated = req.session && req.session.isAuthenticated === true;
+    
+    // If authenticated, add user info to res.locals for use in templates
+    if (res.locals.isAuthenticated) {
+        res.locals.user = {
+            email: req.session.userEmail,
+            isAdmin: req.session.is_admin
+        };
+        
+        // Add session expiry time 
+        const expiryDate = new Date(req.session.cookie._expires);
+        const now = new Date();
+        const hoursLeft = Math.floor((expiryDate - now) / (1000 * 60 * 60));
+        
+        // Log activity for authenticated users (helpful for debugging)
+        console.log(`Authenticated request [${req.method}] ${req.path} by ${req.session.userEmail}`);
+        
+        // Extend session if less than 1 day left (rolling session)
+        if (hoursLeft < 24) {
+            console.log(`Extending session for ${req.session.userEmail} (was expiring in ${hoursLeft} hours)`);
+            req.session.touch();
+        }
+    }
+    
+    next();
 });
 
 // Add a catch-all route handler for 404 errors
@@ -1015,6 +1129,28 @@ app.use((req, res, next) => {
 app.use((err, req, res, next) => {
     console.error(err.stack);
     res.status(500).json({ error: err.message });
+});
+
+// API endpoint to check authentication status
+app.get('/api/auth/status', (req, res) => {
+    if (authUtils.isAuthenticated(req)) {
+        // Return user information but not sensitive data
+        res.json({
+            authenticated: true,
+            user: {
+                email: req.session.userEmail,
+                isAdmin: req.session.is_admin === true
+            },
+            // Add session expiry info
+            session: {
+                expiresIn: new Date(req.session.cookie._expires) - new Date()
+            }
+        });
+    } else {
+        res.json({
+            authenticated: false
+        });
+    }
 });
 
 // Start server
