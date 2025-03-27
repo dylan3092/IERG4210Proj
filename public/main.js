@@ -3,6 +3,8 @@ let categoriesCache = [];
 
 // Initialize the application
 document.addEventListener('DOMContentLoaded', async () => {
+    console.log("DOM Content Loaded, initializing app...");
+    
     // Initialize router with a more specific selector
     router.init('main');
     
@@ -17,7 +19,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     router.register('error', errorHandler);
     
     // Load categories (shared across all pages)
-    await loadCategories();
+    try {
+        console.log("Loading categories...");
+        await loadCategories();
+        console.log("Categories loaded successfully:", categoriesCache);
+    } catch (error) {
+        console.error("Failed to load categories:", error);
+        // Continue anyway to show products
+    }
     
     // Listen for route changes to update categories
     router.on('routeChanged', () => {
@@ -26,8 +35,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // Check if we need to initialize the page structure
     const currentPath = window.location.pathname + window.location.search;
+    console.log("Current path:", currentPath);
     initializePageStructure(currentPath);
     
+    console.log("Handling route change for:", currentPath);
     router.handleRouteChange(currentPath);
 });
 
@@ -114,6 +125,7 @@ function renderCategories() {
 async function homeHandler(params) {
     // Get category from params
     const categoryId = params.category;
+    console.log(`Home handler called with category: ${categoryId}`);
     
     try {
         // Fetch products based on category
@@ -121,7 +133,17 @@ async function homeHandler(params) {
             ? `${BASE_URL}/api/products?category=${sanitize.html(categoryId)}`
             : `${BASE_URL}/api/products`;
             
+        console.log(`Fetching products from: ${productsUrl}`);
+        
         const response = await fetch(productsUrl);
+        console.log(`Product fetch response:`, {
+            status: response.status,
+            statusText: response.statusText,
+            headers: [...response.headers.entries()].reduce((obj, [key, val]) => {
+                obj[key] = val;
+                return obj;
+            }, {})
+        });
         
         if (!response.ok) {
             console.error('Failed to load products:', response.status, response.statusText);
@@ -138,6 +160,7 @@ async function homeHandler(params) {
         }
         
         const products = await response.json();
+        console.log(`Products loaded:`, products);
         
         // Update page title and breadcrumb based on category
         if (categoryId) {

@@ -40,9 +40,10 @@ class Router {
             const link = event.target.closest('a');
             if (!link) return;
 
-            // Skip external links or links with modifiers
+            // Skip external links or links with modifiers or login pages
             if (link.hostname !== window.location.hostname || 
-                event.ctrlKey || event.metaKey || event.shiftKey) {
+                event.ctrlKey || event.metaKey || event.shiftKey ||
+                link.href.includes('login.html')) {
                 return;
             }
 
@@ -76,14 +77,22 @@ class Router {
 
     // Handle route changes
     async handleRouteChange(path) {
+        console.log(`Router handling path: ${path}`);
+        
         // Show loading state
         if (this.contentContainer) {
             this.contentContainer.classList.add('loading');
+            console.log("Added loading class");
+        } else {
+            console.error("Content container not found!", this.contentContainer);
         }
         
         // Check if we need to initialize the page structure
         if (typeof initializePageStructure === 'function') {
+            console.log("Initializing page structure");
             initializePageStructure(path);
+        } else {
+            console.error("initializePageStructure function not found");
         }
         
         // Find matching route handler
@@ -92,17 +101,23 @@ class Router {
         
         // Normalize path by removing leading slash
         const normalizedPath = path.startsWith('/') ? path.substring(1) : path;
+        console.log(`Normalized path: ${normalizedPath}`);
         
         // Check for exact match first
         if (this.routes[normalizedPath]) {
+            console.log(`Found exact route handler for: ${normalizedPath}`);
             handler = this.routes[normalizedPath];
         } else if (this.routes['/'+normalizedPath]) {
+            console.log(`Found slash-prefixed route handler for: /${normalizedPath}`);
             handler = this.routes['/'+normalizedPath];
         } else {
             // Check for pattern matches (e.g., /product/:id)
+            console.log("Checking pattern matches");
             for (const [pattern, routeHandler] of Object.entries(this.routes)) {
+                console.log(`Checking pattern: ${pattern}`);
                 const match = this.matchRoute(pattern, normalizedPath);
                 if (match) {
+                    console.log(`Matched pattern: ${pattern}`);
                     handler = routeHandler;
                     params = match;
                     break;
@@ -112,19 +127,23 @@ class Router {
 
         // If no handler found, use the 404 handler
         if (!handler && this.routes['404']) {
+            console.log("No handler found, using 404 handler");
             handler = this.routes['404'];
         }
 
         // Execute the handler
         if (handler) {
             try {
+                console.log(`Executing handler for: ${path} with params:`, params);
                 this.currentRoute = path;
                 const content = await handler(params);
+                console.log("Handler executed successfully");
                 
                 // Update only the content section, not the entire main element
                 if (content && this.contentContainer) {
                     // Check if we're on the home page or product page
                     const isProductPage = path.includes('product.html');
+                    console.log(`Is product page: ${isProductPage}`);
                     
                     // Find the appropriate content section to update
                     const contentSection = isProductPage 
@@ -132,8 +151,10 @@ class Router {
                         : this.contentContainer.querySelector('.product-list');
                     
                     if (contentSection) {
+                        console.log("Content section found, updating HTML");
                         contentSection.innerHTML = content;
                     } else {
+                        console.log("Content section not found, creating structure");
                         // If the section doesn't exist yet, we need to create the structure
                         this.contentContainer.innerHTML = `
                             <aside>
@@ -147,12 +168,18 @@ class Router {
                         
                         // After creating the structure, we need to re-render categories
                         if (typeof renderCategories === 'function') {
+                            console.log("Re-rendering categories");
                             renderCategories();
+                        } else {
+                            console.error("renderCategories function not found");
                         }
                     }
+                } else {
+                    console.error("No content or content container", { content, container: this.contentContainer });
                 }
                 
                 // Emit route changed event
+                console.log("Emitting routeChanged event");
                 this.emit('routeChanged', { path, params });
                 
             } catch (error) {
@@ -161,14 +188,22 @@ class Router {
                     const errorSection = this.contentContainer.querySelector('.product-list') || 
                                         this.contentContainer.querySelector('.product-details');
                     if (errorSection) {
+                        console.log("Error section found, showing error");
                         errorSection.innerHTML = await this.routes['error'](error);
+                    } else {
+                        console.error("Error section not found");
                     }
+                } else {
+                    console.error("No error handler or content container");
                 }
             }
+        } else {
+            console.error("No handler found for path:", path);
         }
 
         // Remove loading state
         if (this.contentContainer) {
+            console.log("Removing loading class");
             this.contentContainer.classList.remove('loading');
         }
     }

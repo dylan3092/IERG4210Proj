@@ -5,6 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Product Details - Dummy Shopping</title>
   <link rel="stylesheet" href="styles.css">
+  <style>
+    /* Make button look like a link */
+    button.link-button {
+      background: none;
+      border: none;
+      color: blue;
+      text-decoration: underline;
+      cursor: pointer;
+      padding: 0;
+      font: inherit;
+    }
+    button.link-button:hover {
+      color: darkblue;
+    }
+  </style>
 </head>
 <body>
   <header>
@@ -17,7 +32,7 @@
       <div class="user-info">
         Welcome, <span id="user-display">Guest</span>
         <div class="user-actions">
-          <a href="login.html" id="login-link" target="_self">Login</a>
+          <button onclick="window.location.href='login.html'" id="login-link" class="link-button">Login</button>
           <a href="#" id="logout-link" style="display: none;">Logout</a>
           <a href="admin.html" id="admin-link" style="display: none;">Admin Panel</a>
         </div>
@@ -110,15 +125,38 @@
       }
     });
   </script>
+  <!-- Script path detector -->
+  <script>
+    // Try to detect script loading errors and fix paths
+    window.addEventListener('error', function(e) {
+      const target = e.target;
+      // Check if the error is from a script
+      if (target.tagName === 'SCRIPT') {
+        const src = target.src;
+        console.error('Script failed to load:', src);
+        
+        // If the script path starts with 'public/', try without it
+        if (src.includes('/public/')) {
+          const newSrc = src.replace('/public/', '/');
+          console.log('Trying alternative path:', newSrc);
+          
+          // Create a new script element with the fixed path
+          const newScript = document.createElement('script');
+          newScript.src = newSrc;
+          document.body.appendChild(newScript);
+        }
+      }
+    }, true);
+  </script>
   <!-- Load sanitization utilities first -->
-  <script src="public/js/sanitize.js"></script>
+  <script src="public/js/sanitize.js" onerror="this.onerror=null; this.src='js/sanitize.js';"></script>
   <!-- Load shop validation first -->
-  <script src="public/js/shop-validation.js"></script>
+  <script src="public/js/shop-validation.js" onerror="this.onerror=null; this.src='js/shop-validation.js';"></script>
   <!-- Load router -->
-  <script src="public/router.js"></script>
+  <script src="public/router.js" onerror="this.onerror=null; this.src='router.js';"></script>
   <!-- Load cart -->
-  <script src="public/cart.js"></script>
+  <script src="public/cart.js" onerror="this.onerror=null; this.src='cart.js';"></script>
   <!-- Finally load main.js which depends on both -->
-  <script src="public/main.js"></script>
+  <script src="public/main.js" onerror="this.onerror=null; this.src='main.js';"></script>
 </body>
 </html>
