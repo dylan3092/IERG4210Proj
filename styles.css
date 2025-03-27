@@ -122,6 +122,24 @@ aside li {
   width: 60px;
   padding: 5px;
   text-align: center;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  transition: all 0.3s ease;
+}
+
+#quantity:focus {
+  outline: none;
+  border-color: #4CAF50;
+  box-shadow: 0 0 5px rgba(76, 175, 80, 0.2);
+}
+
+#quantity.shop-error {
+  border-color: #ff0000;
+  background-color: #fff0f0;
+}
+
+#quantity.shop-error:focus {
+  box-shadow: 0 0 5px rgba(255, 0, 0, 0.2);
 }
 
 /* Footer */
@@ -222,11 +240,32 @@ footer {
   border: 1px solid #ddd;
   background: #f5f5f5;
   cursor: pointer;
-  transition: background-color 0.2s ease;
+  transition: all 0.2s ease;
 }
 
 .quantity-btn:hover {
   background-color: #e5e5e5;
+}
+
+.quantity-btn:disabled {
+  background-color: #f5f5f5;
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.item-quantity {
+  min-width: 30px;
+  text-align: center;
+  display: inline-block;
+  padding: 2px 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  margin: 0 5px;
+}
+
+.item-quantity.shop-error {
+  border-color: #ff0000;
+  background-color: #fff0f0;
 }
 
 .item-price {
@@ -347,18 +386,122 @@ aside ul li a.active {
 }
 
 /* Form validation styles */
-.error {
-    border-color: #ff0000 !important;
+.form-group {
+    position: relative;
+    margin-bottom: 20px;
+}
+
+.form-group input,
+.form-group textarea,
+.form-group select {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+}
+
+.form-group input:focus,
+.form-group textarea:focus,
+.form-group select:focus {
+    outline: none;
+    border-color: #4CAF50;
+    box-shadow: 0 0 5px rgba(76, 175, 80, 0.2);
+}
+
+.form-group input.error,
+.form-group textarea.error,
+.form-group select.error {
+    border-color: #ff0000;
     background-color: #fff0f0;
+}
+
+.form-group input.error:focus,
+.form-group textarea.error:focus,
+.form-group select.error:focus {
+    box-shadow: 0 0 5px rgba(255, 0, 0, 0.2);
 }
 
 .error-message {
     color: #ff0000;
     font-size: 0.8em;
     margin-top: 5px;
-    display: none;
+    padding: 5px 10px;
+    background-color: #fff0f0;
+    border-radius: 4px;
+    border-left: 4px solid #ff0000;
+    animation: slideIn 0.3s ease;
 }
 
-.error + .error-message {
-    display: block;
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Success state */
+.form-group input:valid:not(.error),
+.form-group textarea:valid:not(.error),
+.form-group select:valid:not(.error) {
+    border-color: #4CAF50;
+    background-color: #f0fff0;
+}
+
+/* Character count for textareas */
+.form-group textarea {
+    min-height: 100px;
+    resize: vertical;
+}
+
+/* File input styling */
+.form-group input[type="file"] {
+    padding: 10px;
+    background-color: #f8f8f8;
+    border: 2px dashed #ddd;
+}
+
+.form-group input[type="file"]:hover {
+    border-color: #4CAF50;
+}
+
+/* Submit button styling */
+button[type="submit"] {
+    background-color: #4CAF50;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+button[type="submit"]:hover {
+    background-color: #45a049;
+}
+
+button[type="submit"]:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+}
+
+/* Shop validation styles */
+.shop-error {
+    border-color: #ff0000 !important;
+    background-color: #fff0f0;
+}
+
+.shop-error-message {
+    color: #ff0000;
+    font-size: 0.8em;
+    margin-top: 5px;
+    padding: 5px 10px;
+    background-color: #fff0f0;
+    border-radius: 4px;
+    border-left: 4px solid #ff0000;
+    animation: slideIn 0.3s ease;
 }

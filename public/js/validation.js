@@ -13,6 +13,9 @@ const validation = {
         if (name.length > 100) {
             return { isValid: false, message: 'Product name must be less than 100 characters' };
         }
+        if (!/^[A-Za-z0-9\s-]+$/.test(name)) {
+            return { isValid: false, message: 'Product name can only contain letters, numbers, spaces, and hyphens' };
+        }
         return { isValid: true, message: '' };
     },
 
@@ -38,6 +41,9 @@ const validation = {
         if (name.length > 50) {
             return { isValid: false, message: 'Category name must be less than 50 characters' };
         }
+        if (!/^[A-Za-z0-9\s-]+$/.test(name)) {
+            return { isValid: false, message: 'Category name can only contain letters, numbers, spaces, and hyphens' };
+        }
         return { isValid: true, message: '' };
     },
 
@@ -53,23 +59,102 @@ const validation = {
             return { isValid: false, message: 'Quantity cannot exceed 100' };
         }
         return { isValid: true, message: '' };
+    },
+
+    // Validate description
+    validateDescription: function(description) {
+        if (!description || description.trim().length === 0) {
+            return { isValid: false, message: 'Description is required' };
+        }
+        if (description.length < 10) {
+            return { isValid: false, message: 'Description must be at least 10 characters' };
+        }
+        if (description.length > 1000) {
+            return { isValid: false, message: 'Description must be less than 1000 characters' };
+        }
+        return { isValid: true, message: '' };
     }
 };
+
+// Create and show error message element
+function showError(input, message) {
+    const formGroup = input.closest('.form-group');
+    let errorDiv = formGroup.querySelector('.error-message');
+    
+    if (!errorDiv) {
+        errorDiv = document.createElement('div');
+        errorDiv.className = 'error-message';
+        formGroup.appendChild(errorDiv);
+    }
+    
+    errorDiv.textContent = message;
+    input.classList.add('error');
+}
+
+// Remove error message element
+function removeError(input) {
+    const formGroup = input.closest('.form-group');
+    const errorDiv = formGroup.querySelector('.error-message');
+    if (errorDiv) {
+        errorDiv.remove();
+    }
+    input.classList.remove('error');
+}
 
 // Add event listeners to forms
 document.addEventListener('DOMContentLoaded', function() {
     const forms = document.querySelectorAll('form');
     forms.forEach(form => {
+        const inputs = form.querySelectorAll('input, textarea, select');
+        
+        // Add real-time validation on input
+        inputs.forEach(input => {
+            input.addEventListener('input', function() {
+                const value = this.value;
+                let validationResult;
+
+                // Determine which validation to use based on input type or name
+                switch(this.type) {
+                    case 'number':
+                        if (this.name.includes('price')) {
+                            validationResult = validation.validatePrice(value);
+                        } else if (this.name.includes('quantity')) {
+                            validationResult = validation.validateQuantity(value);
+                        }
+                        break;
+                    case 'text':
+                        if (this.name.includes('category')) {
+                            validationResult = validation.validateCategoryName(value);
+                        } else if (this.name.includes('product')) {
+                            validationResult = validation.validateProductName(value);
+                        }
+                        break;
+                    case 'textarea':
+                        if (this.name.includes('description')) {
+                            validationResult = validation.validateDescription(value);
+                        }
+                        break;
+                }
+
+                if (validationResult) {
+                    if (!validationResult.isValid) {
+                        showError(this, validationResult.message);
+                    } else {
+                        removeError(this);
+                    }
+                }
+            });
+        });
+
+        // Form submission validation
         form.addEventListener('submit', function(e) {
-            const inputs = form.querySelectorAll('input, textarea, select');
             let isValid = true;
-            let errorMessage = '';
+            let firstInvalidInput = null;
 
             inputs.forEach(input => {
                 const value = input.value;
                 let validationResult;
 
-                // Determine which validation to use based on input type or name
                 switch(input.type) {
                     case 'number':
                         if (input.name.includes('price')) {
@@ -85,20 +170,29 @@ document.addEventListener('DOMContentLoaded', function() {
                             validationResult = validation.validateProductName(value);
                         }
                         break;
+                    case 'textarea':
+                        if (input.name.includes('description')) {
+                            validationResult = validation.validateDescription(value);
+                        }
+                        break;
                 }
 
                 if (validationResult && !validationResult.isValid) {
                     isValid = false;
-                    errorMessage = validationResult.message;
-                    input.classList.add('error');
+                    if (!firstInvalidInput) {
+                        firstInvalidInput = input;
+                    }
+                    showError(input, validationResult.message);
                 } else {
-                    input.classList.remove('error');
+                    removeError(input);
                 }
             });
 
             if (!isValid) {
                 e.preventDefault();
-                alert(errorMessage);
+                if (firstInvalidInput) {
+                    firstInvalidInput.focus();
+                }
             }
         });
     });
