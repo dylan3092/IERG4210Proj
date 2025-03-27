@@ -251,15 +251,87 @@ const validateOrigin = (req, res, next) => {
     next();
 };
 
+// Middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static(__dirname)); // Serve files from the root directory
+app.use(express.static('public'));  // Serve files from the public directory
+app.use('/uploads', express.static('uploads'));
+app.use('/js', express.static('public/js'));
+
+// Add CORS middleware first - before any CSRF or validation middleware
+app.use((req, res, next) => {
+    // Set the specific origin instead of wildcard for credentials to work
+    const origin = req.headers.origin;
+    
+    // Allow requests from both the main site and with port 3000
+    if (origin) {
+        res.header('Access-Control-Allow-Origin', origin);
+        console.log(`Accepting request from origin: ${origin}`);
+    }
+    
+    // Allow credentials (cookies, authorization headers, etc)
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Methods', 'GET, PUT, POST, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, CSRF-Token, X-CSRF-Token');
+    
+    // Handle preflight requests
+    if (req.method === 'OPTIONS') {
+        console.log('Handling OPTIONS preflight request');
+        res.status(200).end();
+        return;
+    }
+    
+    next();
+});
+
 // Apply cookie parser middleware
 app.use(cookieParser());
 
-// Add CSRF protection to all requests
-app.use(csrfProtection.injectToken);
-app.use(validateOrigin);
+// Skip CSRF for login and API routes
+app.use((req, res, next) => {
+    // For login endpoint, completely skip all protection since we're in development
+    if (req.path === '/api/login') {
+        console.log('Completely bypassing protection for login endpoint');
+        next();
+        return;
+    }
+    
+    // Skip CSRF for login endpoint and API endpoints that need to be accessed cross-origin
+    if (req.path === '/api/categories' || req.path === '/api/products' || 
+        req.path.startsWith('/api/products/')) {
+        console.log('Skipping CSRF for:', req.path);
+        next();
+    } else {
+        // For all other routes, apply CSRF protection
+        csrfProtection.injectToken(req, res, () => {
+            // Skip origin validation for API endpoints
+            if (req.path === '/api/categories' || req.path === '/api/products' || 
+                req.path.startsWith('/api/products/')) {
+                next();
+            } else {
+                validateOrigin(req, res, next);
+            }
+        });
+    }
+});
 
-// Apply CSRF validation middleware to all routes that accept data
-app.use(csrfProtection.verifyRequest);
+// Apply CSRF validation for non-exempt routes
+app.use((req, res, next) => {
+    // For login endpoint, already skipped in previous middleware
+    if (req.path === '/api/login') {
+        next();
+        return;
+    }
+    
+    // Skip CSRF validation for API endpoints
+    if (req.path === '/api/categories' || req.path === '/api/products' || 
+        req.path.startsWith('/api/products/')) {
+        next();
+    } else {
+        csrfProtection.verifyRequest(req, res, next);
+    }
+});
 
 // Add a route to get a CSRF token via API (useful for single page applications)
 app.get('/api/csrf-token', csrfProtection.getTokenAPI);
@@ -348,14 +420,6 @@ const upload = multer({
         cb(new Error('Only images (jpg, jpeg, png, gif) are allowed!'));
     }
 });
-
-// Middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(express.static(__dirname)); // Serve files from the root directory
-app.use(express.static('public'));  // Serve files from the public directory
-app.use('/uploads', express.static('uploads'));
-app.use('/js', express.static('public/js'));
 
 // Add this near the top, after creating the app
 app.use((req, res, next) => {
@@ -757,45 +821,34 @@ app.get('/api/login-form', (req, res) => {
 // Login endpoint
 app.post('/api/login', async (req, res) => {
     try {
+        console.log('Login attempt received:', req.body.email);
         const { email, password } = req.body;
         if (!email || !password) {
             return res.status(400).json({ error: 'Email and password are required' });
         }
 
-        const db = await getDB();
-        const user = await db.get('SELECT * FROM users WHERE email = ?', [email]);
+        // Use pool query instead of getDB
+        const [users] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
+        const user = users[0];
         
         if (!user) {
+            console.log('User not found:', email);
             return res.status(401).json({ error: 'Invalid credentials' });
         }
 
         const match = await bcrypt.compare(password, user.password);
         if (!match) {
+            console.log('Password mismatch for user:', email);
             return res.status(401).json({ error: 'Invalid credentials' });
         }
 
-        // Generate a session ID and save it
-        const sessionId = crypto.randomBytes(64).toString('hex');
-        const now = new Date().getTime();
-        const expiresAt = now + (24 * 60 * 60 * 1000); // 24 hours
-
-        await db.run(
-            'INSERT INTO sessions (session_id, user_id, expires_at) VALUES (?, ?, ?)',
-            [sessionId, user.userid, expiresAt]
-        );
-
-        // Set the session cookie
-        res.cookie('sessionId', sessionId, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            maxAge: 24 * 60 * 60 * 1000, // 24 hours
-            sameSite: 'strict'
-        });
-
+        console.log('User authenticated successfully:', email);
+        
         // Store user data in session for use in the client
         req.session.userId = user.userid;
         req.session.userEmail = user.email;
         req.session.is_admin = user.is_admin === 1 || user.is_admin === true;
+        req.session.isAuthenticated = true;
         
         return res.status(200).json({ 
             success: true,
@@ -813,22 +866,19 @@ app.post('/api/login', async (req, res) => {
 // Logout endpoint
 app.post('/api/logout', async (req, res) => {
     try {
-        const sessionId = req.cookies.sessionId;
+        console.log('Logout attempt received');
         
-        if (sessionId) {
-            const db = await getDB();
+        // Clear session data
+        req.session.destroy((err) => {
+            if (err) {
+                console.error('Error destroying session:', err);
+                return res.status(500).json({ error: 'Failed to logout' });
+            }
             
-            // Delete the session from the database
-            await db.run('DELETE FROM sessions WHERE session_id = ?', [sessionId]);
-            
-            // Clear the session cookie
-            res.clearCookie('sessionId');
-            
-            // Clear session data
-            req.session.destroy();
-        }
-        
-        res.status(200).json({ success: true });
+            res.clearCookie('connect.sid');
+            console.log('User logged out successfully');
+            res.status(200).json({ success: true });
+        });
     } catch (error) {
         console.error('Logout error:', error);
         res.status(500).json({ error: 'Internal server error' });

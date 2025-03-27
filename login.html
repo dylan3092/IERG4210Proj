@@ -95,6 +95,16 @@
                 
                 try {
                     console.log(`Attempting to login at: ${BASE_URL}/login`);
+                    // Disable form elements during login attempt
+                    document.getElementById('email').disabled = true;
+                    document.getElementById('password').disabled = true;
+                    document.querySelector('button[type="submit"]').disabled = true;
+                    
+                    // Show loading message
+                    errorMessage.textContent = 'Logging in...';
+                    errorMessage.style.display = 'block';
+                    errorMessage.className = 'alert alert-info';
+                    
                     const response = await fetch(`${BASE_URL}/login`, {
                         method: 'POST',
                         headers: {
@@ -104,32 +114,61 @@
                         credentials: 'include'
                     });
                     
-                    if (!response.ok) {
-                        const errorText = await response.text();
-                        console.error('Login failed:', response.status, errorText);
-                        errorMessage.textContent = 'Login failed: ' + (response.status === 404 ? 'API not found' : errorText || response.statusText);
+                    console.log('Login response status:', response.status);
+                    
+                    const responseText = await response.text();
+                    console.log('Login response text:', responseText);
+                    
+                    let data;
+                    try {
+                        data = JSON.parse(responseText);
+                        console.log('Parsed response data:', data);
+                    } catch (parseError) {
+                        console.error('Failed to parse response as JSON:', parseError);
+                        errorMessage.textContent = 'Login failed: Invalid response format from server';
+                        errorMessage.className = 'alert alert-danger';
                         errorMessage.style.display = 'block';
+                        
+                        // Re-enable form
+                        document.getElementById('email').disabled = false;
+                        document.getElementById('password').disabled = false;
+                        document.querySelector('button[type="submit"]').disabled = false;
                         return;
                     }
                     
-                    const data = await response.json();
-                    
-                    if (response.ok) {
+                    if (response.ok && data.success) {
                         // Store user information in session storage
                         sessionStorage.setItem('userEmail', data.user.email);
                         sessionStorage.setItem('isAdmin', data.user.isAdmin);
                         
-                        // Redirect to admin panel
-                        window.location.href = 'admin.html';
+                        errorMessage.textContent = 'Login successful! Redirecting...';
+                        errorMessage.className = 'alert alert-success';
+                        
+                        // Redirect to admin panel after a short delay
+                        setTimeout(() => {
+                            window.location.href = 'admin.html';
+                        }, 1000);
                     } else {
                         // Show error message
                         errorMessage.textContent = data.error || 'Login failed. Please try again.';
+                        errorMessage.className = 'alert alert-danger';
                         errorMessage.style.display = 'block';
+                        
+                        // Re-enable form
+                        document.getElementById('email').disabled = false;
+                        document.getElementById('password').disabled = false;
+                        document.querySelector('button[type="submit"]').disabled = false;
                     }
                 } catch (error) {
                     console.error('Login error:', error);
-                    errorMessage.textContent = 'An error occurred. Please try again.';
+                    errorMessage.textContent = 'An error occurred: ' + error.message;
+                    errorMessage.className = 'alert alert-danger';
                     errorMessage.style.display = 'block';
+                    
+                    // Re-enable form
+                    document.getElementById('email').disabled = false;
+                    document.getElementById('password').disabled = false;
+                    document.querySelector('button[type="submit"]').disabled = false;
                 }
             });
         }
