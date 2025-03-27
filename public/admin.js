@@ -1,8 +1,8 @@
 // API endpoints
 const API = {
-    categories: `${BASE_URL}/api/categories`,
-    products: `${BASE_URL}/api/products`,
-    csrfToken: `${BASE_URL}/api/csrf-token` // New endpoint for CSRF token
+    categories: `/api/categories`,
+    products: `/api/products`,
+    csrfToken: `/api/csrf-token` // New endpoint for CSRF token
 };
 
 // CSRF token management
@@ -72,17 +72,30 @@ const showMessage = (message, isError = false) => {
 // Categories Management
 const loadCategories = async () => {
     try {
-        const categories = await fetch(API.categories).then(handleResponse);
+        console.log('Fetching categories from:', API.categories);
+        const response = await fetch(API.categories);
+        console.log('Categories response:', response.status, response.statusText);
+        
+        if (!response.ok) {
+            throw new Error(`Failed to load categories: ${response.status} ${response.statusText}`);
+        }
+        
+        const categories = await response.json();
+        console.log('Categories loaded:', categories);
         
         // Update categories list
         const categoriesList = document.getElementById('categories-list');
-        categoriesList.innerHTML = categories.map(category => `
-            <div class="category-item">
-                <span>${category.name}</span>
-                <button onclick="editCategory(${category.catid})">Edit</button>
-                <button onclick="deleteCategory(${category.catid})">Delete</button>
-            </div>
-        `).join('');
+        if (categories.length === 0) {
+            categoriesList.innerHTML = '<p>No categories found. Create your first category using the form above.</p>';
+        } else {
+            categoriesList.innerHTML = categories.map(category => `
+                <div class="category-item">
+                    <span>${category.name}</span>
+                    <button onclick="editCategory(${category.catid})">Edit</button>
+                    <button onclick="deleteCategory(${category.catid})">Delete</button>
+                </div>
+            `).join('');
+        }
 
         // Update product form category dropdown
         const categorySelect = document.getElementById('product-category');
@@ -157,17 +170,30 @@ const deleteCategory = async (catid) => {
 // Products Management
 const loadProducts = async () => {
     try {
-        const products = await fetch(API.products).then(handleResponse);
+        console.log('Fetching products from:', API.products);
+        const response = await fetch(API.products);
+        console.log('Products response:', response.status, response.statusText);
+        
+        if (!response.ok) {
+            throw new Error(`Failed to load products: ${response.status} ${response.statusText}`);
+        }
+        
+        const products = await response.json();
+        console.log('Products loaded:', products);
         
         const productsList = document.getElementById('products-list');
-        productsList.innerHTML = products.map(product => `
-            <div class="product-item">
-                <img src="/uploads/${product.image}" alt="${product.name}" class="preview-image">
-                <span>${product.name} - $${product.price}</span>
-                <button onclick="editProduct(${product.pid})">Edit</button>
-                <button onclick="deleteProduct(${product.pid})">Delete</button>
-            </div>
-        `).join('');
+        if (products.length === 0) {
+            productsList.innerHTML = '<p>No products found. Create your first product using the form above.</p>';
+        } else {
+            productsList.innerHTML = products.map(product => `
+                <div class="product-item">
+                    <img src="/uploads/${product.image}" alt="${product.name}" class="preview-image">
+                    <span>${product.name} - $${product.price}</span>
+                    <button onclick="editProduct(${product.pid})">Edit</button>
+                    <button onclick="deleteProduct(${product.pid})">Delete</button>
+                </div>
+            `).join('');
+        }
     } catch (error) {
         showMessage(error.message, true);
     }
@@ -360,4 +386,52 @@ const setupUserActions = () => {
         // Redirect to login on error
         window.location.href = '/login.html';
     }
-})(); 
+})();
+
+// Initialize everything when the page loads
+document.addEventListener('DOMContentLoaded', async () => {
+    console.log('Admin page initialized');
+    
+    // Check if user is logged in
+    const userEmail = sessionStorage.getItem('userEmail');
+    const isAdmin = sessionStorage.getItem('isAdmin') === 'true';
+    
+    if (!userEmail || !isAdmin) {
+        // Redirect to login page if not logged in or not admin
+        console.log('Not logged in as admin, redirecting to login page');
+        window.location.href = 'login.html';
+        return;
+    }
+    
+    // Set up user email display
+    const userEmailElement = document.getElementById('user-email');
+    if (userEmailElement) {
+        userEmailElement.textContent = userEmail;
+    }
+    
+    // Set up logout button
+    const logoutButton = document.getElementById('logout-button');
+    if (logoutButton) {
+        logoutButton.addEventListener('click', handleLogout);
+    }
+    
+    // Load categories and products
+    try {
+        await loadCategories();
+        await loadProducts();
+    } catch (error) {
+        console.error('Error loading data:', error);
+        showMessage('Error loading data. Please check the console for details.', true);
+    }
+    
+    // Set up form submit handlers
+    const categoryForm = document.getElementById('category-form');
+    if (categoryForm) {
+        categoryForm.addEventListener('submit', handleCategorySubmit);
+    }
+    
+    const productForm = document.getElementById('product-form');
+    if (productForm) {
+        productForm.addEventListener('submit', handleProductSubmit);
+    }
+}); 

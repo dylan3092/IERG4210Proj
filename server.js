@@ -496,6 +496,41 @@ pool.getConnection()
         // Initialize users table and default users
         await authUtils.initializeUsers(pool);
         
+        // Check if categories table exists, create if not
+        try {
+            console.log('Checking categories table...');
+            await pool.query(`
+                CREATE TABLE IF NOT EXISTS categories (
+                    catid INT AUTO_INCREMENT PRIMARY KEY,
+                    name VARCHAR(255) NOT NULL
+                )
+            `);
+            console.log('Categories table exists or was created successfully');
+            
+            // Check if products table exists, create if not
+            await pool.query(`
+                CREATE TABLE IF NOT EXISTS products (
+                    pid INT AUTO_INCREMENT PRIMARY KEY,
+                    catid INT NOT NULL,
+                    name VARCHAR(255) NOT NULL,
+                    price DECIMAL(10, 2) NOT NULL,
+                    description TEXT,
+                    image VARCHAR(255),
+                    thumbnail VARCHAR(255),
+                    FOREIGN KEY (catid) REFERENCES categories(catid) ON DELETE CASCADE
+                )
+            `);
+            console.log('Products table exists or was created successfully');
+            
+            // Count existing categories and products
+            const [categoriesCount] = await pool.query('SELECT COUNT(*) as count FROM categories');
+            const [productsCount] = await pool.query('SELECT COUNT(*) as count FROM products');
+            
+            console.log(`Database has ${categoriesCount[0].count} categories and ${productsCount[0].count} products`);
+        } catch (error) {
+            console.error('Error initializing database tables:', error);
+        }
+        
         connection.release();
     })
     .catch(err => {
