@@ -1403,6 +1403,136 @@ app.get('/api/auth/status', (req, res) => {
     }
 });
 
+// =========================================================================
+// == ORDER CREATION API (/api/create-order)
+// =========================================================================
+app.post('/api/create-order', authUtils.authenticate, async (req, res) => {
+    const userId = req.session.userId; // Get user ID from session (ensured by authenticate)
+    const userEmail = req.session.userEmail; // Get user email from session
+
+    // 1. Validate Incoming Data
+    const cartItems = req.body.items; // Expecting format: [{ pid: "1", quantity: 2 }, ...]
+    if (!Array.isArray(cartItems) || cartItems.length === 0) {
+        return res.status(400).json({ error: 'Invalid or empty cart data.' });
+    }
+
+    const validatedItemsInput = cartItems.map(item => ({
+        pid: parseInt(item.pid), // Ensure pid is integer
+        quantity: parseInt(item.quantity) // Ensure quantity is integer
+    })).filter(item => 
+        !isNaN(item.pid) && item.pid > 0 &&
+        !isNaN(item.quantity) && item.quantity > 0 && item.quantity <= 100 // Add reasonable max quantity
+    );
+
+    if (validatedItemsInput.length !== cartItems.length) {
+        console.warn('Some cart items failed basic validation:', cartItems, validatedItemsInput);
+        return res.status(400).json({ error: 'Invalid item data in cart (PID or quantity).' });
+    }
+    
+    const pids = validatedItemsInput.map(item => item.pid);
+    if (pids.length === 0) {
+         return res.status(400).json({ error: 'No valid items found in cart.' });
+    }
+
+    let connection;
+    try {
+        connection = await pool.getConnection();
+        await connection.beginTransaction();
+
+        // 2. Fetch Product Details & Calculate Total from DB
+        const placeholders = pids.map(() => '?').join(',');
+        const [productsFromDb] = await connection.query(
+            `SELECT pid, name, price FROM products WHERE pid IN (${placeholders})`,
+            pids
+        );
+
+        if (productsFromDb.length !== pids.length) {
+             await connection.rollback(); // Rollback before sending error
+             console.error('DB Fetch Error: Not all product IDs found.', pids, productsFromDb);
+             return res.status(404).json({ error: 'One or more products not found.' });
+        }
+
+        let totalAmount = 0;
+        const finalOrderItems = []; // Items with DB price and name
+
+        const productMap = new Map(productsFromDb.map(p => [p.pid, p]));
+
+        for (const inputItem of validatedItemsInput) {
+            const product = productMap.get(inputItem.pid);
+            if (!product) {
+                 await connection.rollback(); // Should not happen due to length check, but safety first
+                 console.error('Consistency Error: Product missing from map', inputItem.pid);
+                 return res.status(500).json({ error: 'Internal server error during price validation.' });
+            }
+            const priceFromDb = parseFloat(product.price);
+            const itemTotal = priceFromDb * inputItem.quantity;
+            totalAmount += itemTotal;
+
+            finalOrderItems.push({
+                pid: inputItem.pid,
+                quantity: inputItem.quantity,
+                name: product.name, // Needed for PayPal form later? Maybe not needed for digest itself
+                price_at_purchase: priceFromDb
+            });
+        }
+
+        // 3. Generate Salt and Digest
+        const currency = 'HKD'; // Make sure this matches the form
+        // Use environment variable for business email if possible
+        const merchantEmail = process.env.PAYPAL_BUSINESS_EMAIL || 'sb-wfqf430077696@business.example.com'; // Replace with YOUR email
+        const salt = crypto.randomBytes(16).toString('hex');
+
+        // Create a consistent string for hashing. Order matters.
+        // Include only essential data for integrity check: currency, merchant, salt, items (pid, qty, price_at_purchase), total
+        const digestData = JSON.stringify({
+            currency,
+            merchant: merchantEmail,
+            salt,
+            items: finalOrderItems.map(item => ({ // Ensure consistent order/format
+                 pid: item.pid, 
+                 qty: item.quantity, 
+                 price: item.price_at_purchase 
+            })).sort((a, b) => a.pid - b.pid), // Sort by PID for consistency
+            total: totalAmount.toFixed(2) // Use fixed decimal format
+        });
+
+        const digest = crypto.createHash('sha256').update(digestData).digest('hex');
+
+        // 4. Store Order in DB
+        const [orderResult] = await connection.query(
+            'INSERT INTO orders (user_id, user_email, total_amount, currency, salt, digest, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [userId, userEmail, totalAmount.toFixed(2), currency, salt, digest, 'PENDING']
+        );
+        const orderId = orderResult.insertId;
+
+        // Insert items into order_items
+        const itemInsertPromises = finalOrderItems.map(item => {
+            return connection.query(
+                'INSERT INTO order_items (order_id, product_id, quantity, price_at_purchase) VALUES (?, ?, ?, ?)',
+                [orderId, item.pid, item.quantity, item.price_at_purchase.toFixed(2)]
+            );
+        });
+        await Promise.all(itemInsertPromises);
+
+        // 5. Commit Transaction
+        await connection.commit();
+
+        // 6. Return Order ID and Digest to Client
+        res.json({ orderId: orderId, digest: digest });
+
+    } catch (error) {
+        if (connection) {
+            await connection.rollback(); // Rollback on any error
+        }
+        console.error('Error creating order:', error);
+        res.status(500).json({ error: 'Failed to create order due to a server error.' });
+    } finally {
+        if (connection) {
+            connection.release();
+        }
+    }
+});
+
 // Add a catch-all route handler for 404 errors
 app.use((req, res, next) => {
     // API routes should return JSON

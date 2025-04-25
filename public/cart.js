@@ -223,6 +223,14 @@ class ShoppingCart {
             return null;
         }
     }
+
+    // Clear the cart (both in memory and localStorage)
+    clear() {
+        this.items = {};
+        this.save(); // Save the empty cart state
+        this.emit('cleared'); // Emit an event if needed
+        this.emit('updated', this); // Ensure UI updates
+    }
 }
 
 // Function to update hidden fields in the PayPal form
@@ -444,10 +452,77 @@ function removeFromCart(productId) {
 // Initialize cart functionality
 document.addEventListener('DOMContentLoaded', async () => {
     await cart.load();
-});
 
-// Load cart data
-cart.load();
+    // Add Checkout Button Event Listener
+    const checkoutButton = document.getElementById('checkout-btn');
+    const paypalForm = document.getElementById('paypal-cart-form');
+    const invoiceInput = document.getElementById('paypal-invoice');
+    const customInput = document.getElementById('paypal-custom');
+
+    if (checkoutButton && paypalForm && invoiceInput && customInput) {
+        checkoutButton.addEventListener('click', async () => {
+            checkoutButton.disabled = true; // Disable button during processing
+            checkoutButton.textContent = 'Processing...';
+
+            // 1. Get Cart Items (pid and quantity only)
+            const itemsToValidate = Object.values(cart.items).map(item => ({
+                pid: item.productId,
+                quantity: item.quantity
+            }));
+
+            if (itemsToValidate.length === 0) {
+                alert('Your cart is empty.');
+                checkoutButton.disabled = false; // Re-enable
+                checkoutButton.textContent = 'Checkout';
+                return;
+            }
+
+            try {
+                // 2. Send AJAX request to server
+                const response = await fetch('/api/create-order', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        // Include CSRF token if you implement it later
+                        // 'X-CSRF-Token': sessionStorage.getItem('csrfToken') 
+                    },
+                    credentials: 'include', // Send session cookies
+                    body: JSON.stringify({ items: itemsToValidate })
+                });
+
+                if (response.ok) {
+                    const result = await response.json(); // { orderId, digest }
+
+                    // 3. Populate hidden fields
+                    invoiceInput.value = result.orderId;
+                    customInput.value = result.digest;
+
+                    // 4. Clear local cart
+                    cart.clear(); 
+
+                    // 5. Submit PayPal form
+                    console.log('Order validated and created (ID:', result.orderId, '). Submitting to PayPal...');
+                    paypalForm.submit();
+
+                } else {
+                    // Handle errors from the server
+                    const errorData = await response.json();
+                    alert(`Checkout failed: ${errorData.error || 'Unknown server error.'}`);
+                    checkoutButton.disabled = false; // Re-enable
+                    checkoutButton.textContent = 'Checkout';
+                }
+
+            } catch (error) {
+                console.error('Checkout AJAX error:', error);
+                alert('Checkout failed due to a network or client-side error.');
+                checkoutButton.disabled = false; // Re-enable
+                checkoutButton.textContent = 'Checkout';
+            }
+        });
+    } else {
+        console.error('Checkout button or PayPal form/fields not found!');
+    }
+});
 
 // Expose cart controller to window for button click handlers
 window.cartController = cartController;
