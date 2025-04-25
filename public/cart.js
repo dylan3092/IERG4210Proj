@@ -225,6 +225,50 @@ class ShoppingCart {
     }
 }
 
+// Function to update hidden fields in the PayPal form
+function updatePaypalFormFields(cartItems) {
+    const form = document.getElementById('paypal-cart-form');
+    if (!form) {
+        console.error("PayPal form 'paypal-cart-form' not found!");
+        return;
+    }
+
+    const itemContainer = document.getElementById('paypal-items-container');
+    if (!itemContainer) {
+        console.error("PayPal items container 'paypal-items-container' not found!");
+        return;
+    }
+
+    // Clear previous items fields
+    itemContainer.innerHTML = '';
+
+    // Loop through cart items (expecting CartItem instances)
+    Object.values(cartItems).forEach((item, index) => {
+        const itemNumber = index + 1; // PayPal item index starts from 1
+
+        // --- Create item_name_X ---
+        const nameInput = document.createElement('input');
+        nameInput.type = 'hidden';
+        nameInput.name = `item_name_${itemNumber}`;
+        nameInput.value = item.name; // Assuming item.name exists
+        itemContainer.appendChild(nameInput);
+
+        // --- Create item_number_X (using Product ID) ---
+        const numberInput = document.createElement('input');
+        numberInput.type = 'hidden';
+        numberInput.name = `item_number_${itemNumber}`;
+        numberInput.value = item.productId; // Assuming item.productId exists
+        itemContainer.appendChild(numberInput);
+
+        // --- Create quantity_X ---
+        const quantityInput = document.createElement('input');
+        quantityInput.type = 'hidden';
+        quantityInput.name = `quantity_${itemNumber}`;
+        quantityInput.value = item.quantity; // Assuming item.quantity exists
+        itemContainer.appendChild(quantityInput);
+    });
+}
+
 // Cart UI Controller
 class CartUIController {
     constructor(cart) {
@@ -264,46 +308,64 @@ class CartUIController {
     }
 
     updateDisplay() {
-        if (!this.cartList || !this.cartTotal || !this.checkoutBtn) return;
-
-        // Calculate total
-        const total = this.cart.getTotal();
-
-        // Prepare new content with cached images
-        const newContent = Object.entries(this.cart.items).map(([pid, item]) => `
-            <li class="cart-item" data-pid="${sanitize.attribute(pid)}">
-                <div class="item-image">
-                    ${this.cart.imageCache.has(pid) ? 
-                        `<img src="${sanitize.url(this.cart.imageCache.get(pid).src)}" alt="${sanitize.attribute(item.name)}" width="50">` : 
-                        ''}
-                </div>
-                <span class="item-name">${sanitize.html(item.name)}</span>
-                <div class="item-controls">
-                    <button class="quantity-btn" onclick="cartController.updateQuantity('${sanitize.script(pid)}', ${sanitize.html(item.quantity - 1)})">-</button>
-                    <span class="item-quantity">${sanitize.html(item.quantity)}</span>
-                    <button class="quantity-btn" onclick="cartController.updateQuantity('${sanitize.script(pid)}', ${sanitize.html(item.quantity + 1)})">+</button>
-                </div>
-                <span class="item-price">$${sanitize.html(item.getTotal().toFixed(2))}</span>
-                <button class="remove-item" onclick="cartController.removeItem('${sanitize.script(pid)}')">×</button>
-            </li>
-        `).join('');
-
-        // Smooth transition for total
-        const currentTotal = parseFloat(this.cartTotal.textContent.replace('$', ''));
-        if (currentTotal !== total) {
-            this.animateValue(this.cartTotal, currentTotal, total, 300);
+        if (!this.cartList || !this.cartTotal || !this.checkoutBtn) {
+            console.warn('Cart UI elements not found. Skipping update.');
+            return;
         }
-
-        // Update cart items with transition
-        if (this.cartList.innerHTML !== newContent) {
-            this.cartList.style.opacity = '0';
-            setTimeout(() => {
-                this.cartList.innerHTML = newContent;
-                this.cartList.style.opacity = '1';
-            }, 150);
+        
+        this.cartList.innerHTML = ''; // Clear existing items
+        const items = Object.values(this.cart.items);
+        
+        if (items.length === 0) {
+            this.cartList.innerHTML = '<li>Your cart is empty.</li>';
+            this.checkoutBtn.disabled = true;
+        } else {
+            items.forEach(item => {
+                const li = document.createElement('li');
+                li.dataset.pid = item.productId;
+                
+                // Sanitize all dynamic content before adding to DOM
+                const safeName = sanitize.html(item.name);
+                const safePrice = sanitize.number(item.price, 2).toFixed(2);
+                const safeTotal = sanitize.number(item.getTotal(), 2).toFixed(2);
+                const safeQuantity = sanitize.number(item.quantity);
+                
+                // Use textContent for safe text insertion
+                li.innerHTML = `
+                    ${safeName} - 
+                    $${safePrice} x 
+                    <input type="number" class="quantity-input" value="${safeQuantity}" min="1" max="100" data-pid="${item.productId}"> = 
+                    $${safeTotal}
+                    <button class="remove-item" data-pid="${item.productId}">Remove</button>
+                `;
+                this.cartList.appendChild(li);
+            });
+            this.checkoutBtn.disabled = false;
         }
-
-        this.checkoutBtn.disabled = total === 0;
+        
+        // Update total (animate)
+        const currentTotal = parseFloat(this.cartTotal.textContent.replace(/[^\d.]/g, '')) || 0;
+        const newTotal = this.cart.getTotal();
+        this.animateValue(this.cartTotal, currentTotal, newTotal, 300);
+        
+        // ** Add call to update PayPal hidden fields **
+        updatePaypalFormFields(this.cart.items);
+        
+        // Add event listeners to new quantity inputs and remove buttons
+        this.cartList.querySelectorAll('.quantity-input').forEach(input => {
+            input.addEventListener('change', () => {
+                const productId = input.getAttribute('data-pid');
+                const newQuantity = parseInt(input.value);
+                this.updateQuantity(productId, newQuantity);
+            });
+        });
+        
+        this.cartList.querySelectorAll('.remove-item').forEach(button => {
+            button.addEventListener('click', () => {
+                const productId = button.getAttribute('data-pid');
+                this.removeItem(productId);
+            });
+        });
     }
 
     // Animate number changes

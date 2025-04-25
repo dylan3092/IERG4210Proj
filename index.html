@@ -47,20 +47,38 @@
   </header>
 
   <!-- Hover-based cart that appears in both main and product pages -->
-  <section class="shopping-cart">
-    <div class="cart-summary">
-      <!-- Collapsed view showing total price -->
-      <p>Total: <span id="cart-total">$0.00</span></p>
-    </div>
-    <div class="cart-details">
-      <!-- Expanded view on hover, showing details of items -->
-      <h2>Shopping List</h2>
-      <ul id="cart-items">
-        <!-- Cart items will be dynamically added here -->
-      </ul>
-      <button type="submit" id="checkout-btn" disabled>Checkout</button>
-    </div>
-  </section>
+  <form id="paypal-cart-form" action="https://www.sandbox.paypal.com/cgi-bin/webscr" method="post">
+    <section class="shopping-cart">
+      <div class="cart-summary">
+        <!-- Collapsed view showing total price -->
+        <p>Total: <span id="cart-total">$0.00</span></p>
+      </div>
+      <div class="cart-details">
+        <!-- Expanded view on hover, showing details of items -->
+        <h2>Shopping List</h2>
+        <ul id="cart-items">
+          <!-- Cart items will be dynamically added here -->
+        </ul>
+        <button type="button" id="checkout-btn" disabled>Checkout</button>
+      </div>
+    </section>
+
+    <!-- Static PayPal Fields -->
+    <input type="hidden" name="cmd" value="_cart">
+    <input type="hidden" name="upload" value="1">
+    <!-- IMPORTANT: Replace with your ACTUAL PayPal Sandbox Business Email -->
+    <input type="hidden" name="business" value="sb-wfqf430077696@business.example.com">
+    <input type="hidden" name="charset" value="utf-8">
+    <!-- Verify this is the correct currency -->
+    <input type="hidden" name="currency_code" value="HKD">
+
+    <!-- Dynamic Fields (Populated by JS after server validation) -->
+    <input type="hidden" name="invoice" id="paypal-invoice" value="">
+    <input type="hidden" name="custom" id="paypal-custom" value="">
+
+    <!-- Container for dynamically added PayPal item fields -->
+    <div id="paypal-items-container"></div>
+  </form>
 
   <main>
     <!-- Left column: Categories list -->
