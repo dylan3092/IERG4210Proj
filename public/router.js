@@ -40,11 +40,15 @@ class Router {
             const link = event.target.closest('a');
             if (!link) return;
 
-            // Skip external links or links with modifiers or login pages
+            // Skip external links, links with modifiers, login page, or the admin link
+            const href = link.getAttribute('href'); // Use getAttribute for robustness
             if (link.hostname !== window.location.hostname || 
+                href === '/admin' ||
+                href === '/admin.html' ||
                 event.ctrlKey || event.metaKey || event.shiftKey ||
-                link.href.includes('login.html')) {
-                return;
+                (href && href.includes('login.html'))) {
+                console.log(`Router ignoring link click: ${href}`);
+                return; // Let the browser handle these clicks normally
             }
 
             // Prevent default link behavior

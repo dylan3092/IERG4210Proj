@@ -223,7 +223,7 @@ async function homeHandler(params) {
                         <h3>${sanitize.html(product.name)}</h3>
                     </a>
                     <p class="price">$${sanitize.html(price.toFixed(2))}</p>
-                    <button type="button" onclick="addToCart(${sanitize.attribute(product.pid)}, 1)">Add to Cart</button>
+                    <button type="button" onclick="console.log('Add to cart clicked for PID:', ${product.pid}); addToCart(${sanitize.attribute(product.pid)}, 1)">Add to Cart</button>
                 </article>
             `;
         }).join('');
