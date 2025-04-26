@@ -1423,11 +1423,13 @@ app.get('/api/auth/status', (req, res) => {
 // == ORDER CREATION API (/api/create-order)
 // =========================================================================
 app.post('/api/create-order', authUtils.authenticate, async (req, res) => {
-    const userId = req.session.userId; // Get user ID from session (ensured by authenticate)
-    const userEmail = req.session.userEmail; // Get user email from session
+    const userId = req.session.userId; 
+    const userEmail = req.session.userEmail; 
+    console.log(`[create-order] Starting order creation for user: ${userEmail} (ID: ${userId})`); // Log start
 
     // 1. Validate Incoming Data
-    const cartItems = req.body.items; // Expecting format: [{ pid: "1", quantity: 2 }, ...]
+    const cartItems = req.body.items; 
+    console.log('[create-order] Raw cart items received:', cartItems); // Log input
     if (!Array.isArray(cartItems) || cartItems.length === 0) {
         return res.status(400).json({ error: 'Invalid or empty cart data.' });
     }
@@ -1446,38 +1448,42 @@ app.post('/api/create-order', authUtils.authenticate, async (req, res) => {
     }
     
     const pids = validatedItemsInput.map(item => item.pid);
+    console.log('[create-order] Validated PIDs:', pids); // Log validated PIDs
     if (pids.length === 0) {
          return res.status(400).json({ error: 'No valid items found in cart.' });
     }
 
     let connection;
     try {
+        console.log('[create-order] Attempting to get DB connection...'); // Log connection attempt
         connection = await pool.getConnection();
+        console.log('[create-order] DB connection obtained. Starting transaction...'); // Log connection success
         await connection.beginTransaction();
+        console.log('[create-order] Transaction started.'); // Log transaction start
 
         // 2. Fetch Product Details & Calculate Total from DB
         const placeholders = pids.map(() => '?').join(',');
-        const [productsFromDb] = await connection.query(
-            `SELECT pid, name, price FROM products WHERE pid IN (${placeholders})`,
-            pids
-        );
+        const sql = `SELECT pid, name, price FROM products WHERE pid IN (${placeholders})`;
+        console.log('[create-order] Fetching product details with SQL:', sql, pids); // Log product fetch query
+        const [productsFromDb] = await connection.query(sql, pids);
+        console.log('[create-order] Products fetched from DB:', productsFromDb); // Log fetched products
 
         if (productsFromDb.length !== pids.length) {
-             await connection.rollback(); // Rollback before sending error
-             console.error('DB Fetch Error: Not all product IDs found.', pids, productsFromDb);
+             console.error('[create-order] DB Fetch Error: Not all product IDs found. Rolling back.', pids, productsFromDb);
+             await connection.rollback(); 
              return res.status(404).json({ error: 'One or more products not found.' });
         }
 
         let totalAmount = 0;
-        const finalOrderItems = []; // Items with DB price and name
-
+        const finalOrderItems = []; 
         const productMap = new Map(productsFromDb.map(p => [p.pid, p]));
 
+        console.log('[create-order] Calculating total and preparing final items...'); // Log calculation start
         for (const inputItem of validatedItemsInput) {
             const product = productMap.get(inputItem.pid);
             if (!product) {
-                 await connection.rollback(); // Should not happen due to length check, but safety first
-                 console.error('Consistency Error: Product missing from map', inputItem.pid);
+                 console.error('[create-order] Consistency Error: Product missing from map', inputItem.pid);
+                 await connection.rollback(); 
                  return res.status(500).json({ error: 'Internal server error during price validation.' });
             }
             const priceFromDb = parseFloat(product.price);
@@ -1491,59 +1497,67 @@ app.post('/api/create-order', authUtils.authenticate, async (req, res) => {
                 price_at_purchase: priceFromDb
             });
         }
+        console.log('[create-order] Total calculated:', totalAmount, 'Final items:', finalOrderItems); // Log calculation end
 
         // 3. Generate Salt and Digest
-        const currency = 'HKD'; // Make sure this matches the form
-        // Use environment variable for business email if possible
-        const merchantEmail = process.env.PAYPAL_BUSINESS_EMAIL || 'sb-wfqf430077696@business.example.com'; // Replace with YOUR email
+        const currency = 'HKD'; 
+        const merchantEmail = process.env.PAYPAL_BUSINESS_EMAIL || 'sb-wfqf430077696@business.example.com'; 
         const salt = crypto.randomBytes(16).toString('hex');
-
-        // Create a consistent string for hashing. Order matters.
-        // Include only essential data for integrity check: currency, merchant, salt, items (pid, qty, price_at_purchase), total
         const digestData = JSON.stringify({
             currency,
             merchant: merchantEmail,
             salt,
-            items: finalOrderItems.map(item => ({ // Ensure consistent order/format
+            items: finalOrderItems.map(item => ({
                  pid: item.pid, 
                  qty: item.quantity, 
                  price: item.price_at_purchase 
-            })).sort((a, b) => a.pid - b.pid), // Sort by PID for consistency
-            total: totalAmount.toFixed(2) // Use fixed decimal format
+            })).sort((a, b) => a.pid - b.pid),
+            total: totalAmount.toFixed(2)
         });
-
         const digest = crypto.createHash('sha256').update(digestData).digest('hex');
+        console.log('[create-order] Salt and Digest generated:', { salt, digest }); // Log digest generation
 
         // 4. Store Order in DB
-        const [orderResult] = await connection.query(
-            'INSERT INTO orders (user_id, user_email, total_amount, currency, salt, digest, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [userId, userEmail, totalAmount.toFixed(2), currency, salt, digest, 'PENDING']
-        );
+        const orderSql = 'INSERT INTO orders (user_id, user_email, total_amount, currency, salt, digest, status) VALUES (?, ?, ?, ?, ?, ?, ?)';
+        const orderParams = [userId, userEmail, totalAmount.toFixed(2), currency, salt, digest, 'PENDING'];
+        console.log('[create-order] Inserting into orders table:', orderSql, orderParams); // Log order insert query
+        const [orderResult] = await connection.query(orderSql, orderParams);
         const orderId = orderResult.insertId;
+        console.log('[create-order] Order inserted successfully. Order ID:', orderId); // Log order insert success
 
         // Insert items into order_items
+        console.log('[create-order] Inserting order items...'); // Log item insert start
         const itemInsertPromises = finalOrderItems.map(item => {
-            return connection.query(
-                'INSERT INTO order_items (order_id, product_id, quantity, price_at_purchase) VALUES (?, ?, ?, ?)',
-                [orderId, item.pid, item.quantity, item.price_at_purchase.toFixed(2)]
-            );
+            const itemSql = 'INSERT INTO order_items (order_id, product_id, quantity, price_at_purchase) VALUES (?, ?, ?, ?)';
+            const itemParams = [orderId, item.pid, item.quantity, item.price_at_purchase.toFixed(2)];
+            // console.log('[create-order] Item SQL:', itemSql, itemParams); // Optional: Log each item query
+            return connection.query(itemSql, itemParams);
         });
         await Promise.all(itemInsertPromises);
+        console.log('[create-order] Order items inserted successfully.'); // Log item insert success
 
         // 5. Commit Transaction
+        console.log('[create-order] Committing transaction...'); // Log commit attempt
         await connection.commit();
+        console.log('[create-order] Transaction committed.'); // Log commit success
 
         // 6. Return Order ID and Digest to Client
+        console.log('[create-order] Sending success response to client:', { orderId, digest }); // Log success response
         res.json({ orderId: orderId, digest: digest });
 
     } catch (error) {
+        // Log the specific error that occurred *before* rollback
+        console.error('[create-order] Error occurred within try block:', error); 
         if (connection) {
-            await connection.rollback(); // Rollback on any error
+            console.log('[create-order] Rolling back transaction due to error.'); // Log rollback attempt
+            await connection.rollback(); 
+            console.log('[create-order] Transaction rolled back.'); // Log rollback success
         }
-        console.error('Error creating order:', error);
+        // The generic error response is fine, the detailed error is in the log above
         res.status(500).json({ error: 'Failed to create order due to a server error.' });
     } finally {
         if (connection) {
+            console.log('[create-order] Releasing DB connection.'); // Log connection release
             connection.release();
         }
     }
