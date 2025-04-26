@@ -427,4 +427,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (productForm) {
         productForm.addEventListener('submit', handleProductSubmit);
     }
+
+    // Finally, hide loader and show body
+    const loader = document.getElementById('auth-loader');
+    if (loader) {
+        loader.style.display = 'none'; // Hide the loader
+    }
+    document.body.style.visibility = 'visible'; // Show the main content
+    console.log('[Admin DOMContentLoaded] Initialization complete. Body visible.');
 }); 
