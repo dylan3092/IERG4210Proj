@@ -103,6 +103,9 @@ class Router {
         const normalizedPath = path.startsWith('/') ? path.substring(1) : path;
         console.log(`Normalized path: ${normalizedPath}`);
         
+        // Log registered routes for debugging
+        console.log('Registered routes:', Object.keys(this.routes));
+        
         // Check for exact match first
         if (this.routes[normalizedPath]) {
             console.log(`Found exact route handler for: ${normalizedPath}`);

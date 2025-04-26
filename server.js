@@ -163,15 +163,18 @@ const authUtils = {
     
     // Admin authorization middleware with enhanced security and logging
     authorizeAdmin: (req, res, next) => {
-        if (authUtils.isAuthenticated(req) && authUtils.isAdmin(req)) {
+        const isAuthenticated = authUtils.isAuthenticated(req);
+        const isAdmin = authUtils.isAdmin(req);
+        const ipAddress = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+        console.log(`[authorizeAdmin Check] Path: ${req.originalUrl}, Authenticated: ${isAuthenticated}, IsAdmin: ${isAdmin}, Session User:`, req.session.userEmail);
+        
+        if (isAuthenticated && isAdmin) {
             // Log admin authorization success
-            const ipAddress = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
             console.log(`[ADMIN AUTH SUCCESS] Admin ${req.session.userEmail} authorized from ${ipAddress} for ${req.method} ${req.originalUrl}`);
             next();
-        } else if (authUtils.isAuthenticated(req)) {
+        } else if (isAuthenticated) {
             // Log non-admin access attempt to admin resource
-            const ipAddress = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-            console.log(`[ADMIN AUTH FAILURE] Non-admin user ${req.session.userEmail} attempted to access admin resource from ${ipAddress}: ${req.method} ${req.originalUrl}`);
+            console.log(`[ADMIN AUTH FAILURE - Not Admin] User ${req.session.userEmail} attempted access from ${ipAddress}: ${req.method} ${req.originalUrl}`);
             
             // Redirect to home page for HTML requests
             if (req.accepts('html')) {
@@ -186,8 +189,7 @@ const authUtils = {
             });
         } else {
             // Log unauthenticated access attempt to admin resource
-            const ipAddress = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-            console.log(`[ADMIN AUTH FAILURE] Unauthenticated access attempt to admin resource from ${ipAddress}: ${req.method} ${req.originalUrl}`);
+            console.log(`[ADMIN AUTH FAILURE - Not Authenticated] Unauthenticated access attempt from ${ipAddress}: ${req.method} ${req.originalUrl}`);
             
             // Redirect to login page for HTML requests
             if (req.accepts('html')) {
@@ -1168,14 +1170,25 @@ app.post('/api/login', async (req, res) => {
             // Rotate session to prevent session fixation attacks
             await rotateSession(req, sessionData);
             
-            // Return success response
-            return res.status(200).json({ 
-                success: true,
-                user: {
-                    email: user.email,
-                    isAdmin: sessionData.is_admin
+            // Explicitly save the session before sending the response
+            req.session.save((saveErr) => {
+                if (saveErr) {
+                    console.error('Error saving session after login rotation:', saveErr);
+                    // Proceed with login but log the error
+                    return res.status(500).json({ error: 'Session save error during login' }); 
                 }
+                
+                console.log('Session saved after rotation. Sending success response.');
+                // Return success response AFTER session is saved
+                return res.status(200).json({ 
+                    success: true,
+                    user: {
+                        email: user.email,
+                        isAdmin: sessionData.is_admin
+                    }
+                });
             });
+
         } catch (sessionError) {
             console.error('Error during session rotation:', sessionError);
             return res.status(500).json({ error: 'Session error during login' });

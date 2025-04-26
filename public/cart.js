@@ -76,14 +76,17 @@ class ShoppingCart {
 
     // Save cart to localStorage
     save() {
+        console.log("[Cart.save] Saving cart to localStorage:", this.items); // Log save
         localStorage.setItem('shopping_cart', JSON.stringify({
             items: this.items
         }));
         this.emit('updated', this);
+        console.log("[Cart.save] Emitted 'updated' event."); // Log emit
     }
 
     // Add item to cart
     async addItem(productId, quantity = 1) {
+        console.log(`[Cart.addItem] Start. ProductId: ${productId}, Quantity: ${quantity}, isLoading: ${this.isLoading}`); // Log start
         if (this.isLoading) return;
         this.isLoading = true;
         
@@ -128,12 +131,14 @@ class ShoppingCart {
 
             // Save and notify
             this.save();
+            console.log(`[Cart.addItem] Saved cart. Emitting itemAdded.`); // Log before emit
             this.emit('itemAdded', { productId: sanitizedProductId, quantity });
             
         } catch (error) {
-            console.error('Error adding to cart:', error);
+            console.error('[Cart.addItem] Error adding to cart:', error); // Log error
         } finally {
             this.isLoading = false;
+            console.log(`[Cart.addItem] Finished. isLoading: ${this.isLoading}`); // Log finish
         }
     }
 
@@ -286,7 +291,10 @@ class CartUIController {
         this.checkoutBtn = document.getElementById('checkout-btn');
         
         // Set up event listeners
-        this.cart.on('updated', () => this.updateDisplay());
+        this.cart.on('updated', () => {
+             console.log("[CartUIController] Received 'updated' event from cart."); // Log event received
+             this.updateDisplay();
+        });
         this.cart.on('itemAdded', () => this.showAddedFeedback());
         
         // Initialize UI
@@ -316,6 +324,7 @@ class CartUIController {
     }
 
     updateDisplay() {
+        console.log("[CartUIController.updateDisplay] Updating cart display."); // Log display update start
         if (!this.cartList || !this.cartTotal || !this.checkoutBtn) {
             console.warn('Cart UI elements not found. Skipping update.');
             return;
@@ -358,6 +367,7 @@ class CartUIController {
         
         // ** Add call to update PayPal hidden fields **
         updatePaypalFormFields(this.cart.items);
+        console.log("[CartUIController.updateDisplay] Finished updating display."); // Log display update end
         
         // Add event listeners to new quantity inputs and remove buttons
         this.cartList.querySelectorAll('.quantity-input').forEach(input => {
@@ -435,7 +445,9 @@ const cartController = new CartUIController(cart);
 
 // Public API for use in HTML
 function addToCart(productId, quantity = 1) {
+    console.log(`[addToCart] Called with productId: ${productId}, quantity: ${quantity}`); // Log entry
     const sanitizedProductId = sanitize.html(productId);
+    console.log(`[addToCart] Sanitized productId: ${sanitizedProductId}`); // Log sanitized ID
     cart.addItem(sanitizedProductId, sanitize.number(quantity, 1));
 }
 
