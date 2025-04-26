@@ -341,16 +341,12 @@ const setupUserActions = () => {
 
 // First, fetch the CSRF token, then load initial data
 (async () => {
+    console.log('[Admin IIFE] Initializing...');
     try {
-        // Check if we're authenticated first
-        const checkAuth = await fetch(`${BASE_URL}/api/categories`);
-        if (!checkAuth.ok) {
-            // If not authenticated, redirect to login
-            window.location.href = '/login.html';
-            return;
-        }
-        
-        await fetchCsrfToken();
+        // Remove the premature auth check and redirect based on API call
+        // The server-side middleware should handle unauthorized access.
+        // We still fetch CSRF token first.
+        await fetchCsrfToken(); 
         
         // Inject CSRF tokens into the forms
         const categoryPlaceholder = document.getElementById('csrf-category-placeholder');
@@ -379,30 +375,27 @@ const setupUserActions = () => {
         setupUserActions();
         
         // Load data after CSRF setup is complete
-        loadCategories();
-        loadProducts();
+        // Let's move data loading to DOMContentLoaded to ensure elements exist
+        // loadCategories(); 
+        // loadProducts();
     } catch (error) {
-        console.error('Error initializing admin panel:', error);
-        // Redirect to login on error
-        window.location.href = '/login.html';
+        console.error('Error initializing admin panel (IIFE):', error);
+        // Don't redirect here, let server handle auth
+        // window.location.href = '/login.html'; 
+        showMessage('Initialization error. Check console.', true);
     }
 })();
 
 // Initialize everything when the page loads
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log('Admin page initialized');
+    console.log('[Admin DOMContentLoaded] Initializing...');
     
-    // Check if user is logged in
+    // We rely on the server-side middleware to block unauthorized access.
+    // If this script runs, the user *should* be an authorized admin.
+    // We can still check sessionStorage for displaying user info, but don't redirect.
     const userEmail = sessionStorage.getItem('userEmail');
-    const isAdmin = sessionStorage.getItem('isAdmin') === 'true';
-    
-    if (!userEmail || !isAdmin) {
-        // Redirect to login page if not logged in or not admin
-        console.log('Not logged in as admin, redirecting to login page');
-        window.location.href = 'login.html';
-        return;
-    }
-    
+    // const isAdmin = sessionStorage.getItem('isAdmin') === 'true'; // No longer needed for redirect
+
     // Set up user email display
     const userEmailElement = document.getElementById('user-email');
     if (userEmailElement) {
