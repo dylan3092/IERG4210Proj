@@ -495,8 +495,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        // Include CSRF token if you implement it later
-                        // 'X-CSRF-Token': sessionStorage.getItem('csrfToken') 
+                        // Include CSRF token
+                        'X-CSRF-Token': sessionStorage.getItem('csrfToken')
                     },
                     credentials: 'include', // Send session cookies
                     body: JSON.stringify({ items: itemsToValidate })
