@@ -359,8 +359,3 @@ function initializePageStructure(path) {
         renderCategories();
     }
 }
-
-// Add to cart
-function addToCart(productId, quantity) {
-    // Implementation of addToCart function
-}

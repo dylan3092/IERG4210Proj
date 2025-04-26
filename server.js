@@ -18,6 +18,9 @@ const https = require('https'); // Also import https at the top
 
 const app = express();
 
+// Trust the first hop from the reverse proxy (Apache)
+app.set('trust proxy', 1); 
+
 // Number of salt rounds for bcrypt
 const SALT_ROUNDS = 12;
 
