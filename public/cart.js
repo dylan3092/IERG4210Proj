@@ -206,7 +206,7 @@ class ShoppingCart {
     async fetchProductDetails(productId) {
         try {
             const sanitizedProductId = encodeURIComponent(sanitize.html(productId));
-            const response = await fetch(`${BASE_URL}/api/products/${sanitizedProductId}`);
+            const response = await fetch(`${BASE_URL}/products/${sanitizedProductId}`);
             if (!response.ok) {
                 throw new Error('Product not found');
             }

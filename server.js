@@ -237,7 +237,7 @@ app.use(session({
     cookie: {
         secure: true, // Always use secure cookies
         httpOnly: true,
-        sameSite: 'strict', // Helps prevent CSRF - additional protection
+        sameSite: 'lax', // Changed from 'strict' to 'lax' for redirect compatibility
         maxAge: 3 * 24 * 60 * 60 * 1000 // 3 days as per requirements
     },
     // Add custom session ID generation for maximum security

@@ -1,8 +1,8 @@
 // API endpoints
 const API = {
-    categories: `${BASE_URL}/api/categories`,
-    products: `${BASE_URL}/api/products`,
-    csrfToken: `${BASE_URL}/api/csrf-token` // New endpoint for CSRF token
+    categories: `${BASE_URL}/categories`,
+    products: `${BASE_URL}/products`,
+    csrfToken: `${BASE_URL}/csrf-token`
 };
 
 // CSRF token management
