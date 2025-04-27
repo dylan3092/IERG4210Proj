@@ -426,38 +426,36 @@ app.use('/js', express.static('public/js'));
 // == SPECIAL ROUTES (Define BEFORE global body parsers/CSRF if they have specific needs)
 // =========================================================================
 
-// PAYPAL IPN HANDLER - Use separate body-parser middleware
-// 1. Parse as raw first to capture buffer
-app.post('/api/paypal-ipn', bodyParser.raw({ type: 'application/x-www-form-urlencoded' }), (req, res, next) => {
-    // Store the raw buffer on req object
-    req.rawBodyBuffer = req.body; // bodyParser.raw puts the buffer into req.body
-    // Log to confirm raw buffer capture
-    console.log(`[IPN Raw Middleware] Raw body buffer captured, length: ${req.rawBodyBuffer?.length}`);
-    next(); // Pass control to the next middleware
-});
+// PAYPAL IPN HANDLER - Use express.raw() to get the buffer, then parse manually
+app.post('/api/paypal-ipn', express.raw({ type: 'application/x-www-form-urlencoded', limit: '10mb' }), (req, res) => {
+    // By using express.raw, req.body should *be* the raw Buffer
+    const rawBodyBuffer = req.body;
+    console.log(`[IPN Handler] Received raw buffer, length: ${rawBodyBuffer?.length}`);
 
-// 2. Parse as urlencoded now for easy access to fields
-app.post('/api/paypal-ipn', bodyParser.urlencoded({ extended: true }), (req, res) => {
-    // req.body is now the parsed urlencoded data
-    // req.rawBodyBuffer should contain the raw data from the previous middleware
-    console.log('[IPN Handler] Parsed body received:', req.body);
-    console.log(`[IPN Handler] Raw body buffer length from middleware: ${req.rawBodyBuffer?.length}`);
-
-    // Respond to PayPal immediately with 200 OK to acknowledge receipt
-    res.status(200).send('OK');
+    // Respond to PayPal immediately
+    res.status(200).send('OK'); 
 
     // --- Process IPN verification --- 
-    const rawBodyString = req.rawBodyBuffer ? req.rawBodyBuffer.toString('utf8') : null;
-    const parsedBodyCopy = { ...req.body };
-
-    if (!rawBodyString) {
-        console.error('[IPN] Verification failed: Raw body string was empty or null after capture.');
+    if (!rawBodyBuffer || rawBodyBuffer.length === 0) {
+        console.error('[IPN] Verification failed: Raw body buffer was empty or missing.');
         return;
     }
+    
+    // Convert buffer to string for verification and manual parsing
+    const rawBodyString = rawBodyBuffer.toString('utf8');
+    console.log('[IPN] Raw body string:', rawBodyString);
+
+    // Manually parse the necessary fields from the raw string for later use
+    // (Using URLSearchParams is a safe way to handle urlencoded data)
+    const parsedParams = new URLSearchParams(rawBodyString);
+    const parsedBodyCopy = {};
+    parsedParams.forEach((value, key) => { parsedBodyCopy[key] = value; });
+    console.log('[IPN] Manually parsed body for checks:', parsedBodyCopy);
 
     // Use IIFE for async verification
     (async () => {
         try {
+            // 1. Construct verification request body using the RAW string
             let verificationBody = `cmd=_notify-verify&${rawBodyString}`;
             
             // 2. Send verification request back to PayPal Sandbox
@@ -490,12 +488,12 @@ app.post('/api/paypal-ipn', bodyParser.urlencoded({ extended: true }), (req, res
 
             console.log('[IPN] Verification response from PayPal:', paypalRes);
 
-            // 3. Process Verification Result (using parsedBodyCopy)
+            // 3. Process Verification Result (using manually parsed parsedBodyCopy)
             if (paypalRes === 'VERIFIED') {
                 console.log('[IPN] VERIFIED. Processing payment data...');
                 const { 
                     invoice, custom, txn_id, payment_status, mc_gross, mc_currency, receiver_email 
-                } = parsedBodyCopy; // Use the copied parsed body
+                } = parsedBodyCopy; // Use the manually parsed body
 
                 // Basic checks
                 if (!invoice || !custom || !txn_id) {
