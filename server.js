@@ -415,25 +415,23 @@ const validateOrigin = (req, res, next) => {
 };
 
 // Middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 app.use(express.static(__dirname)); // Serve files from the root directory
 app.use(express.static('public'));  // Serve files from the public directory
 app.use('/uploads', express.static('uploads'));
 app.use('/js', express.static('public/js'));
 
 // =========================================================================
-// == SPECIAL ROUTES (Define BEFORE global body parsers/CSRF if they have specific needs)
+// == SPECIAL ROUTES (Define BEFORE global body parsers if they have specific needs)
 // =========================================================================
 
-// PAYPAL IPN HANDLER - Use express.raw() to get the buffer, then parse manually
+// PAYPAL IPN HANDLER - Use express.raw() BEFORE global parsers
 app.post('/api/paypal-ipn', express.raw({ type: 'application/x-www-form-urlencoded', limit: '10mb' }), (req, res) => {
     // By using express.raw, req.body should *be* the raw Buffer
     const rawBodyBuffer = req.body;
     console.log(`[IPN Handler] Received raw buffer, length: ${rawBodyBuffer?.length}`);
 
     // Respond to PayPal immediately
-    res.status(200).send('OK'); 
+    res.status(200).send('OK');
 
     // --- Process IPN verification --- 
     if (!rawBodyBuffer || rawBodyBuffer.length === 0) {
@@ -525,7 +523,7 @@ app.post('/api/paypal-ipn', express.raw({ type: 'application/x-www-form-urlencod
                         console.warn(`[IPN] Payment status for Order ID ${invoice} is '${payment_status}', not 'Completed'. Ignoring.`);
                         return; 
                     }
-                    const expectedEmail = process.env.PAYPAL_BUSINESS_EMAIL || 'sb-43rt9j39948135@business.example.com';
+                    const expectedEmail = process.env.PAYPAL_BUSINESS_EMAIL || 'sb-wfqf430077696@business.example.com'; // Corrected default email
                     if (receiver_email !== expectedEmail) {
                         console.error(`[IPN] Receiver email mismatch for Order ID ${invoice}. Expected: ${expectedEmail}, Received: ${receiver_email}`);
                         return; 
@@ -575,6 +573,10 @@ app.post('/api/paypal-ipn', express.raw({ type: 'application/x-www-form-urlencod
 // =========================================================================
 // == GLOBAL MIDDLEWARE (Body Parsers, Security Headers, CORS, Logging, etc.)
 // =========================================================================
+
+// GLOBAL Body Parsers - Define AFTER special routes like IPN
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // Security headers middleware
 app.use((req, res, next) => {
