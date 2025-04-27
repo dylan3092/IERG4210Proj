@@ -1567,143 +1567,16 @@ app.post('/api/create-order', authUtils.authenticate, async (req, res) => {
 });
 
 // =========================================================================
-// == PAYPAL IPN (Instant Payment Notification) HANDLER
+// == MINIMAL PAYPAL IPN TEST HANDLER
 // =========================================================================
-// Use urlencoded middleware specifically for this route as PayPal sends x-www-form-urlencoded data
 app.post('/api/paypal-ipn', express.urlencoded({ extended: true }), async (req, res) => {
-    console.log('[IPN] Received notification:', req.body);
-
-    // Respond to PayPal immediately with 200 OK to acknowledge receipt
-    res.status(200).send('OK'); 
-
-    // --- Asynchronously verify the IPN --- 
-    // 1. Construct verification request body
-    let verificationBody = 'cmd=_notify-verify';
-    for (const key in req.body) {
-        if (req.body.hasOwnProperty(key)) {
-            verificationBody += `&${key}=${encodeURIComponent(req.body[key])}`;
-        }
-    }
-
-    // 2. Send verification request back to PayPal Sandbox
-    const options = {
-        hostname: 'ipnpb.sandbox.paypal.com', // Sandbox verification URL
-        port: 443,
-        path: '/cgi-bin/webscr',
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Content-Length': verificationBody.length,
-            'Connection': 'close' // Important for PayPal IPN verification
-        }
-    };
-
-    try {
-        const paypalRes = await new Promise((resolve, reject) => {
-            const verificationReq = https.request(options, (paypalRes) => {
-                let data = '';
-                paypalRes.on('data', (chunk) => { data += chunk; });
-                paypalRes.on('end', () => resolve(data));
-            });
-
-            verificationReq.on('error', (e) => {
-                console.error('[IPN] Verification request error:', e);
-                reject(e);
-            });
-
-            verificationReq.write(verificationBody);
-            verificationReq.end();
-        });
-
-        console.log('[IPN] Verification response from PayPal:', paypalRes);
-
-        // 3. Process Verification Result
-        if (paypalRes === 'VERIFIED') {
-            console.log('[IPN] VERIFIED. Processing payment data...');
-
-            const { 
-                invoice, // Our Order ID
-                custom, // Our Digest
-                txn_id, // PayPal Transaction ID
-                payment_status,
-                mc_gross, // Total amount paid
-                mc_currency, // Currency
-                receiver_email // Should match our business email
-            } = req.body;
-
-            // Basic checks
-            if (!invoice || !custom || !txn_id) {
-                 console.error('[IPN] Missing critical fields (invoice, custom, or txn_id).');
-                 return; // Stop processing
-            }
-
-            // Fetch original order details from DB
-            let connection;
-            try {
-                connection = await pool.getConnection();
-                const [orders] = await connection.query('SELECT * FROM orders WHERE order_id = ?', [invoice]);
-                
-                if (orders.length === 0) {
-                    console.error(`[IPN] Order ID ${invoice} not found in database.`);
-                    return; // Stop processing
-                }
-                const order = orders[0];
-
-                // Perform validation checks
-                if (order.status === 'COMPLETED') {
-                    console.warn(`[IPN] Transaction ${txn_id} for Order ID ${invoice} already processed.`);
-                    return; // Prevent double processing
-                }
-                if (payment_status !== 'Completed') {
-                    console.warn(`[IPN] Payment status for Order ID ${invoice} is '${payment_status}', not 'Completed'. Ignoring.`);
-                    // Optionally update DB status to reflect PayPal status (e.g., PENDING, FAILED)
-                    // await connection.query('UPDATE orders SET status = ? WHERE order_id = ?', [payment_status.toUpperCase(), invoice]);
-                    return; 
-                }
-                const expectedEmail = process.env.PAYPAL_BUSINESS_EMAIL || 'sb-43rt9j39948135@business.example.com';
-                if (receiver_email !== expectedEmail) {
-                    console.error(`[IPN] Receiver email mismatch for Order ID ${invoice}. Expected: ${expectedEmail}, Received: ${receiver_email}`);
-                    return; 
-                }
-                if (mc_currency !== order.currency) {
-                     console.error(`[IPN] Currency mismatch for Order ID ${invoice}. Expected: ${order.currency}, Received: ${mc_currency}`);
-                     return; 
-                }
-                if (parseFloat(mc_gross) !== parseFloat(order.total_amount)) {
-                     console.error(`[IPN] Amount mismatch for Order ID ${invoice}. Expected: ${order.total_amount}, Received: ${mc_gross}`);
-                     return; 
-                }
-                if (custom !== order.digest) {
-                     console.error(`[IPN] Digest mismatch for Order ID ${invoice}. Transaction may be tampered.`);
-                     // Update status to reflect potential fraud
-                     await connection.query('UPDATE orders SET status = ? WHERE order_id = ?', ['INVALID_DIGEST', invoice]);
-                     return; 
-                }
-
-                // ALL CHECKS PASSED - Update order status
-                console.log(`[IPN] All checks passed for Order ID ${invoice}. Updating status to COMPLETED.`);
-                await connection.query(
-                    'UPDATE orders SET status = ?, paypal_txn_id = ? WHERE order_id = ?',
-                    ['COMPLETED', txn_id, invoice]
-                );
-                console.log(`[IPN] Order ID ${invoice} successfully marked as COMPLETED.`);
-
-            } catch (dbError) {
-                 console.error('[IPN] Database error during verification:', dbError);
-            } finally {
-                 if (connection) connection.release();
-            }
-
-        } else if (paypalRes === 'INVALID') {
-            console.error('[IPN] INVALID response from PayPal. IPN data may be fraudulent.');
-            // Potentially flag the order ID received in req.body.invoice
-        } else {
-             console.warn('[IPN] Received unexpected verification response from PayPal:', paypalRes);
-        }
-
-    } catch (verificationError) {
-         console.error('[IPN] Error during verification process:', verificationError);
-    }
+    console.log('--- MINIMAL IPN Handler Reached ---');
+    // Log headers to see if Content-Type is correct
+    console.log('IPN Request Headers:', JSON.stringify(req.headers, null, 2));
+    // Log the body received
+    console.log('IPN Request Body:', JSON.stringify(req.body, null, 2));
+    res.status(200).send('OK_MINIMAL_TEST');
+    // No verification logic for now
 });
 
 // Add a catch-all route handler for 404 errors
@@ -1734,42 +1607,6 @@ const server = app.listen(httpPort, () => {
     console.log(`Server is listening on port ${httpPort}`);
     console.log(`Try opening http://localhost:${httpPort} in your browser`);
 });
-
-// Check if SSL certificates exist before trying to create HTTPS server
-// This section can be commented out if you're using Apache with SSL
-/*
-try {
-    // Check if certificate files exist
-    const homeDir = process.env.HOME || '/home/ec2-user';
-    const certPath = `${homeDir}/certificates/fullchain.pem`;
-    const keyPath = `${homeDir}/certificates/privkey.pem`;
-    
-    if (!fs.existsSync(certPath) || !fs.existsSync(keyPath)) {
-        throw new Error(`Certificate files not found at ${certPath} or ${keyPath}`);
-    }
-    
-    // Path to Let's Encrypt certificates
-    const sslOptions = {
-        key: fs.readFileSync(keyPath),
-        cert: fs.readFileSync(certPath)
-    };
-
-    // Create HTTPS server
-    const httpsServer = https.createServer(sslOptions, app);
-    const httpsPort = 443; // Note: Binding to port 443 requires root privileges
-    
-    httpsServer.listen(httpsPort, () => {
-        console.log(`HTTPS Server running on port ${httpsPort}`);
-        console.log(`Try opening https://s15.ierg4210.ie.cuhk.edu.hk in your browser`);
-    });
-    
-    console.log('SSL enabled with Let\'s Encrypt certificates');
-} catch (error) {
-    console.log('SSL certificates not found or permission issue. Running in HTTP mode only.');
-    console.log('To enable HTTPS, install Let\'s Encrypt certificates and restart the server.');
-    console.log('Error details:', error.message);
-}
-*/
 
 // Notify that we're relying on Apache for SSL
 console.log('Running in HTTP mode only. SSL/HTTPS is managed by Apache.');
