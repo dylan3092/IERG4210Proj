@@ -617,7 +617,7 @@ try {
 }
 
 // Database connection
-const pool = mysql.createPool({
+const dbConfig = {
     host: process.env.DB_HOST || 'localhost',
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD, // Using environment variable for security
@@ -626,7 +626,10 @@ const pool = mysql.createPool({
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0
-});
+};
+console.log('[DB Connection] Creating pool with config:', dbConfig);
+
+const pool = mysql.createPool(dbConfig);
 
 // Define image sizes
 const IMAGE_SIZES = {
