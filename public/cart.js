@@ -524,9 +524,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                     // 4. Clear local cart
                     cart.clear(); 
 
-                    // 5. Submit PayPal form
+                    // 5. Submit PayPal form (with a tiny delay for DOM updates)
                     console.log('Order validated and created (ID:', result.orderId, '). Submitting to PayPal...');
-                    paypalForm.submit();
+                    setTimeout(() => {
+                        paypalForm.submit();
+                    }, 10); // Small delay (e.g., 10ms) to allow browser to register new hidden fields
 
                 } else {
                     // Handle errors from the server
