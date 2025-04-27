@@ -286,7 +286,10 @@ function updatePaypalFormFields(cartItems) {
         amountInput.name = `amount_${itemNumber}`;
         // Ensure price is formatted correctly (e.g., 2 decimal places)
         // Assuming item.price is the price per single unit
-        amountInput.value = item.price.toFixed(2);
+        console.log(`[updatePaypalFormFields] Item ${itemNumber} (PID: ${item.productId}) Price: ${item.price}, Type: ${typeof item.price}`); // Log price before formatting
+        const formattedAmount = item.price.toFixed(2);
+        amountInput.value = formattedAmount;
+        console.log(`[updatePaypalFormFields] Setting amount_${itemNumber} hidden field value to: ${formattedAmount}`); // Log value being set
         itemContainer.appendChild(amountInput);
     });
 }
