@@ -465,7 +465,9 @@ app.post('/api/paypal-ipn', express.raw({ type: 'application/x-www-form-urlencod
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
                     'Content-Length': verificationBody.length,
-                    'Connection': 'close' 
+                    'Connection': 'close',
+                    'Host': 'ipnpb.sandbox.paypal.com', // Explicitly set Host header
+                    'User-Agent': 'NodeJS-IPN-Verification' // Add a User-Agent
                 }
             };
 
@@ -523,7 +525,7 @@ app.post('/api/paypal-ipn', express.raw({ type: 'application/x-www-form-urlencod
                         console.warn(`[IPN] Payment status for Order ID ${invoice} is '${payment_status}', not 'Completed'. Ignoring.`);
                         return; 
                     }
-                    const expectedEmail = process.env.PAYPAL_BUSINESS_EMAIL || 'sb-wfqf430077696@business.example.com'; // Corrected default email
+                    const expectedEmail = process.env.PAYPAL_BUSINESS_EMAIL || 'sb-43rt9j39948135@business.example.com'; // Corrected default email based on logs
                     if (receiver_email !== expectedEmail) {
                         console.error(`[IPN] Receiver email mismatch for Order ID ${invoice}. Expected: ${expectedEmail}, Received: ${receiver_email}`);
                         return; 
@@ -1660,7 +1662,7 @@ app.post('/api/create-order', authUtils.authenticate, async (req, res) => {
 
         // 3. Generate Salt and Digest
         const currency = 'HKD'; 
-        const merchantEmail = process.env.PAYPAL_BUSINESS_EMAIL || 'sb-wfqf430077696@business.example.com'; 
+        const merchantEmail = process.env.PAYPAL_BUSINESS_EMAIL || 'sb-43rt9j39948135@business.example.com'; 
         const salt = crypto.randomBytes(16).toString('hex');
         const digestData = JSON.stringify({
             currency,
