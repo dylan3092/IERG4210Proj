@@ -515,17 +515,35 @@ document.addEventListener('DOMContentLoaded', async () => {
                 });
 
                 if (response.ok) {
-                    const result = await response.json(); // { orderId, digest }
+                    const result = await response.json(); 
 
-                    // 3. Populate hidden fields
+                    // 3. Populate static hidden fields
                     invoiceInput.value = result.orderId;
                     customInput.value = result.digest;
+
+                    // --- Explicitly update dynamic item fields RIGHT BEFORE submission ---
+                    console.log('[Checkout] Explicitly calling updatePaypalFormFields...');
+                    updatePaypalFormFields(cart.items); // Call the function directly here
+                    console.log('[Checkout] updatePaypalFormFields finished.');
+                    // --- End explicit update ---
+
+                    // Log form data just before submission attempt
+                    console.log('[Checkout] Logging FormData before submission...');
+                    try {
+                        const formData = new FormData(paypalForm);
+                        for (let [key, value] of formData.entries()) { 
+                            console.log(`  FormData Entry: ${key}=${value}`);
+                        }
+                    } catch (e) {
+                        console.error('Error creating or logging FormData:', e);
+                    }
+                    console.log('[Checkout] paypal-items-container innerHTML:', document.getElementById('paypal-items-container')?.innerHTML);
 
                     // 4. Clear local cart
                     cart.clear(); 
 
                     // 5. Submit PayPal form using a temporary submit button
-                    console.log('Order validated and created (ID:', result.orderId, '). Preparing to submit to PayPal...');
+                    console.log('Order validated (ID:', result.orderId, '). Preparing to submit to PayPal...');
                     
                     // Create a temporary submit button
                     const tempSubmitButton = document.createElement('button');
@@ -538,7 +556,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     // Use setTimeout to ensure button is registered before click
                     setTimeout(() => {
                         console.log('Clicking temporary submit button...');
-                        tempSubmitButton.click(); // Click the hidden button
+                        tempSubmitButton.click(); 
                         // Optional: Remove the button after clicking (though page navigation will likely happen first)
                         // paypalForm.removeChild(tempSubmitButton);
                     }, 200); // Keep a small delay just in case
