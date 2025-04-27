@@ -528,7 +528,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     console.log('Order validated and created (ID:', result.orderId, '). Submitting to PayPal...');
                     setTimeout(() => {
                         paypalForm.submit();
-                    }, 10); // Small delay (e.g., 10ms) to allow browser to register new hidden fields
+                    }, 200); // Increased delay to 200ms for testing
 
                 } else {
                     // Handle errors from the server
