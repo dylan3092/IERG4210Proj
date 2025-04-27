@@ -426,39 +426,39 @@ app.use('/js', express.static('public/js'));
 // == SPECIAL ROUTES (Define BEFORE global body parsers/CSRF if they have specific needs)
 // =========================================================================
 
-// Function to capture raw body for IPN verification
-const captureRawBody = (req, res, buf, encoding) => {
-    if (buf && buf.length) {
-        req.rawBody = buf.toString(encoding || 'utf8');
-    } else {
-        req.rawBody = '';
-    }
-};
+// PAYPAL IPN HANDLER - Use separate body-parser middleware
+// 1. Parse as raw first to capture buffer
+app.post('/api/paypal-ipn', bodyParser.raw({ type: 'application/x-www-form-urlencoded' }), (req, res, next) => {
+    // Store the raw buffer on req object
+    req.rawBodyBuffer = req.body; // bodyParser.raw puts the buffer into req.body
+    // Log to confirm raw buffer capture
+    console.log(`[IPN Raw Middleware] Raw body buffer captured, length: ${req.rawBodyBuffer?.length}`);
+    next(); // Pass control to the next middleware
+});
 
-// PAYPAL IPN HANDLER (Needs x-www-form-urlencoded, define before global JSON parser)
-app.post('/api/paypal-ipn', express.urlencoded({ extended: true, verify: captureRawBody }), (req, res) => { 
-    console.log('[IPN] Received notification. Parsed body:', req.body);
-    console.log('[IPN] Raw body received:', req.rawBody);
+// 2. Parse as urlencoded now for easy access to fields
+app.post('/api/paypal-ipn', bodyParser.urlencoded({ extended: true }), (req, res) => {
+    // req.body is now the parsed urlencoded data
+    // req.rawBodyBuffer should contain the raw data from the previous middleware
+    console.log('[IPN Handler] Parsed body received:', req.body);
+    console.log(`[IPN Handler] Raw body buffer length from middleware: ${req.rawBodyBuffer?.length}`);
 
     // Respond to PayPal immediately with 200 OK to acknowledge receipt
-    res.status(200).send('OK'); 
+    res.status(200).send('OK');
 
-    // --- Process IPN verification (Can be done without awaiting here) --- 
-    // Make a copy of the raw body now, as req object might change later
-    const rawBodyCopy = req.rawBody;
-    const parsedBodyCopy = { ...req.body }; // Also copy parsed body for later use
+    // --- Process IPN verification --- 
+    const rawBodyString = req.rawBodyBuffer ? req.rawBodyBuffer.toString('utf8') : null;
+    const parsedBodyCopy = { ...req.body };
 
-    if (!rawBodyCopy) {
-        console.error('[IPN] Verification failed: Raw body was empty immediately after capture.');
-        return; // Cannot verify without raw body
+    if (!rawBodyString) {
+        console.error('[IPN] Verification failed: Raw body string was empty or null after capture.');
+        return;
     }
 
-    // Use an immediately-invoked async function expression (IIFE) 
-    // for the verification network call and DB updates, allowing the main handler to return quickly.
+    // Use IIFE for async verification
     (async () => {
         try {
-            // 1. Construct verification request body using the RAW body copy
-            let verificationBody = `cmd=_notify-verify&${rawBodyCopy}`;
+            let verificationBody = `cmd=_notify-verify&${rawBodyString}`;
             
             // 2. Send verification request back to PayPal Sandbox
             const options = {
@@ -571,8 +571,7 @@ app.post('/api/paypal-ipn', express.urlencoded({ extended: true, verify: capture
         } catch (verificationError) {
             console.error('[IPN] Error during async verification process:', verificationError);
         }
-    })(); // Immediately invoke the async function
-
+    })();
 });
 
 // =========================================================================
