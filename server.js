@@ -422,6 +422,22 @@ app.use(express.static('public'));  // Serve files from the public directory
 app.use('/uploads', express.static('uploads'));
 app.use('/js', express.static('public/js'));
 
+// =========================================================================
+// == SPECIAL ROUTES (Define BEFORE global body parsers/CSRF if they have specific needs)
+// =========================================================================
+
+// PAYPAL IPN HANDLER (Needs x-www-form-urlencoded, define before global JSON parser)
+app.post('/api/paypal-ipn', express.urlencoded({ extended: true }), async (req, res) => {
+    console.log('--- MINIMAL IPN Handler Reached ---');
+    console.log('IPN Request Headers:', JSON.stringify(req.headers, null, 2));
+    console.log('IPN Request Body:', JSON.stringify(req.body, null, 2));
+    res.status(200).send('OK_MINIMAL_TEST');
+});
+
+// =========================================================================
+// == GLOBAL MIDDLEWARE (Body Parsers, Security Headers, CORS, Logging, etc.)
+// =========================================================================
+
 // Security headers middleware
 app.use((req, res, next) => {
     // Prevent browsers from detecting MIME types incorrectly
@@ -1564,19 +1580,6 @@ app.post('/api/create-order', authUtils.authenticate, async (req, res) => {
             connection.release();
         }
     }
-});
-
-// =========================================================================
-// == MINIMAL PAYPAL IPN TEST HANDLER
-// =========================================================================
-app.post('/api/paypal-ipn', express.urlencoded({ extended: true }), async (req, res) => {
-    console.log('--- MINIMAL IPN Handler Reached ---');
-    // Log headers to see if Content-Type is correct
-    console.log('IPN Request Headers:', JSON.stringify(req.headers, null, 2));
-    // Log the body received
-    console.log('IPN Request Body:', JSON.stringify(req.body, null, 2));
-    res.status(200).send('OK_MINIMAL_TEST');
-    // No verification logic for now
 });
 
 // Add a catch-all route handler for 404 errors
