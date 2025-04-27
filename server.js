@@ -1504,7 +1504,7 @@ app.post('/api/create-order', authUtils.authenticate, async (req, res) => {
 
         // 3. Generate Salt and Digest
         const currency = 'HKD'; 
-        const merchantEmail = process.env.PAYPAL_BUSINESS_EMAIL || 'sb-43rt9j39948135@business.example.com'; 
+        const merchantEmail = process.env.PAYPAL_BUSINESS_EMAIL || 'sb-wfqf430077696@business.example.com'; 
         const salt = crypto.randomBytes(16).toString('hex');
         const digestData = JSON.stringify({
             currency,

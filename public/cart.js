@@ -528,7 +528,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     console.log('Order validated and created (ID:', result.orderId, '). Submitting to PayPal...');
                     setTimeout(() => {
                         paypalForm.submit();
-                    }, 200); // Increased delay to 200ms for testing
+                    }, 20000); // Increased delay to 200ms for testing
 
                 } else {
                     // Handle errors from the server
