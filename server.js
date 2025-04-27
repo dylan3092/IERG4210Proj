@@ -436,144 +436,143 @@ const captureRawBody = (req, res, buf, encoding) => {
 };
 
 // PAYPAL IPN HANDLER (Needs x-www-form-urlencoded, define before global JSON parser)
-app.post('/api/paypal-ipn', express.urlencoded({ extended: true, verify: captureRawBody }), async (req, res) => {
+app.post('/api/paypal-ipn', express.urlencoded({ extended: true, verify: captureRawBody }), (req, res) => { 
     console.log('[IPN] Received notification. Parsed body:', req.body);
     console.log('[IPN] Raw body received:', req.rawBody);
 
     // Respond to PayPal immediately with 200 OK to acknowledge receipt
     res.status(200).send('OK'); 
 
-    // --- Asynchronously verify the IPN --- 
-    // 1. Construct verification request body using the RAW body
-    if (!req.rawBody) {
-        console.error('[IPN] Verification failed: Raw body was empty.');
+    // --- Process IPN verification (Can be done without awaiting here) --- 
+    // Make a copy of the raw body now, as req object might change later
+    const rawBodyCopy = req.rawBody;
+    const parsedBodyCopy = { ...req.body }; // Also copy parsed body for later use
+
+    if (!rawBodyCopy) {
+        console.error('[IPN] Verification failed: Raw body was empty immediately after capture.');
         return; // Cannot verify without raw body
     }
-    let verificationBody = `cmd=_notify-verify&${req.rawBody}`;
-    
-    // 2. Send verification request back to PayPal Sandbox
-    const options = {
-        hostname: 'ipnpb.sandbox.paypal.com', // Sandbox verification URL
-        port: 443,
-        path: '/cgi-bin/webscr',
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Content-Length': verificationBody.length,
-            'Connection': 'close' // Important for PayPal IPN verification
-        }
-    };
 
-    try {
-        const paypalRes = await new Promise((resolve, reject) => {
-            const verificationReq = https.request(options, (paypalRes) => {
-                let data = '';
-                paypalRes.on('data', (chunk) => { data += chunk; });
-                paypalRes.on('end', () => resolve(data));
-            });
-
-            verificationReq.on('error', (e) => {
-                console.error('[IPN] Verification request error:', e);
-                reject(e);
-            });
+    // Use an immediately-invoked async function expression (IIFE) 
+    // for the verification network call and DB updates, allowing the main handler to return quickly.
+    (async () => {
+        try {
+            // 1. Construct verification request body using the RAW body copy
+            let verificationBody = `cmd=_notify-verify&${rawBodyCopy}`;
+            
+            // 2. Send verification request back to PayPal Sandbox
+            const options = {
+                hostname: 'ipnpb.sandbox.paypal.com', 
+                port: 443,
+                path: '/cgi-bin/webscr',
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'Content-Length': verificationBody.length,
+                    'Connection': 'close' 
+                }
+            };
 
             console.log('[IPN] Sending verification request body (length):', verificationBody.length);
-            // console.log('[IPN] Verification body being sent:', verificationBody); // Optional: Log full body if needed, careful with sensitive data
-            verificationReq.write(verificationBody);
-            verificationReq.end();
-        });
+            const paypalRes = await new Promise((resolve, reject) => {
+                const verificationReq = https.request(options, (paypalRes) => {
+                    let data = '';
+                    paypalRes.on('data', (chunk) => { data += chunk; });
+                    paypalRes.on('end', () => resolve(data));
+                });
+                verificationReq.on('error', (e) => {
+                    console.error('[IPN] Verification request error:', e);
+                    reject(e);
+                });
+                verificationReq.write(verificationBody);
+                verificationReq.end();
+            });
 
-        console.log('[IPN] Verification response from PayPal:', paypalRes);
+            console.log('[IPN] Verification response from PayPal:', paypalRes);
 
-        // 3. Process Verification Result
-        if (paypalRes === 'VERIFIED') {
-            console.log('[IPN] VERIFIED. Processing payment data...');
+            // 3. Process Verification Result (using parsedBodyCopy)
+            if (paypalRes === 'VERIFIED') {
+                console.log('[IPN] VERIFIED. Processing payment data...');
+                const { 
+                    invoice, custom, txn_id, payment_status, mc_gross, mc_currency, receiver_email 
+                } = parsedBodyCopy; // Use the copied parsed body
 
-            const { 
-                invoice, // Our Order ID
-                custom, // Our Digest
-                txn_id, // PayPal Transaction ID
-                payment_status,
-                mc_gross, // Total amount paid
-                mc_currency, // Currency
-                receiver_email // Should match our business email
-            } = req.body;
+                // Basic checks
+                if (!invoice || !custom || !txn_id) {
+                     console.error('[IPN] Missing critical fields (invoice, custom, or txn_id).');
+                     return; // Stop processing
+                }
 
-            // Basic checks
-            if (!invoice || !custom || !txn_id) {
-                 console.error('[IPN] Missing critical fields (invoice, custom, or txn_id).');
-                 return; // Stop processing
+                // Fetch original order details from DB
+                let connection;
+                try {
+                    connection = await pool.getConnection();
+                    console.log(`[IPN] Checking database for Order ID: ${invoice}`); // Add log
+                    const [orders] = await connection.query('SELECT * FROM orders WHERE order_id = ?', [invoice]);
+                    
+                    if (orders.length === 0) {
+                        console.error(`[IPN] Order ID ${invoice} not found in database.`);
+                        return; // Stop processing
+                    }
+                    const order = orders[0];
+                    console.log(`[IPN] Found order:`, order); // Add log
+
+                    // Perform validation checks
+                    console.log(`[IPN] Validating order data...`); // Add log
+                    if (order.status === 'COMPLETED') {
+                        console.warn(`[IPN] Transaction ${txn_id} for Order ID ${invoice} already processed.`);
+                        return; // Prevent double processing
+                    }
+                    if (payment_status !== 'Completed') {
+                        console.warn(`[IPN] Payment status for Order ID ${invoice} is '${payment_status}', not 'Completed'. Ignoring.`);
+                        return; 
+                    }
+                    const expectedEmail = process.env.PAYPAL_BUSINESS_EMAIL || 'sb-43rt9j39948135@business.example.com';
+                    if (receiver_email !== expectedEmail) {
+                        console.error(`[IPN] Receiver email mismatch for Order ID ${invoice}. Expected: ${expectedEmail}, Received: ${receiver_email}`);
+                        return; 
+                    }
+                    if (mc_currency !== order.currency) {
+                         console.error(`[IPN] Currency mismatch for Order ID ${invoice}. Expected: ${order.currency}, Received: ${mc_currency}`);
+                         return; 
+                    }
+                    if (parseFloat(mc_gross) !== parseFloat(order.total_amount)) {
+                         console.error(`[IPN] Amount mismatch for Order ID ${invoice}. Expected: ${order.total_amount}, Received: ${mc_gross}`);
+                         return; 
+                    }
+                    if (custom !== order.digest) {
+                         console.error(`[IPN] Digest mismatch for Order ID ${invoice}. Transaction may be tampered.`);
+                         await connection.query('UPDATE orders SET status = ? WHERE order_id = ?', ['INVALID_DIGEST', invoice]);
+                         return; 
+                    }
+
+                    // ALL CHECKS PASSED - Update order status
+                    console.log(`[IPN] All checks passed for Order ID ${invoice}. Updating status to COMPLETED.`);
+                    await connection.query(
+                        'UPDATE orders SET status = ?, paypal_txn_id = ? WHERE order_id = ?',
+                        ['COMPLETED', txn_id, invoice]
+                    );
+                    console.log(`[IPN] Order ID ${invoice} successfully marked as COMPLETED.`);
+
+                } catch (dbError) {
+                     console.error('[IPN] Database error during verification:', dbError);
+                } finally {
+                     if (connection) {
+                        console.log(`[IPN] Releasing DB connection for order ${invoice}.`); // Add log
+                        connection.release();
+                     }
+                }
+
+            } else if (paypalRes === 'INVALID') {
+                 console.error('[IPN] INVALID response from PayPal. IPN data may be fraudulent.');
+            } else {
+                 console.warn('[IPN] Received unexpected verification response from PayPal:', paypalRes);
             }
-
-            // Fetch original order details from DB
-            let connection;
-            try {
-                connection = await pool.getConnection();
-                console.log(`[IPN] Checking database for Order ID: ${invoice}`); // Add log
-                const [orders] = await connection.query('SELECT * FROM orders WHERE order_id = ?', [invoice]);
-                
-                if (orders.length === 0) {
-                    console.error(`[IPN] Order ID ${invoice} not found in database.`);
-                    return; // Stop processing
-                }
-                const order = orders[0];
-                console.log(`[IPN] Found order:`, order); // Add log
-
-                // Perform validation checks
-                console.log(`[IPN] Validating order data...`); // Add log
-                if (order.status === 'COMPLETED') {
-                    console.warn(`[IPN] Transaction ${txn_id} for Order ID ${invoice} already processed.`);
-                    return; // Prevent double processing
-                }
-                if (payment_status !== 'Completed') {
-                    console.warn(`[IPN] Payment status for Order ID ${invoice} is '${payment_status}', not 'Completed'. Ignoring.`);
-                    return; 
-                }
-                const expectedEmail = process.env.PAYPAL_BUSINESS_EMAIL || 'sb-43rt9j39948135@business.example.com';
-                if (receiver_email !== expectedEmail) {
-                    console.error(`[IPN] Receiver email mismatch for Order ID ${invoice}. Expected: ${expectedEmail}, Received: ${receiver_email}`);
-                    return; 
-                }
-                if (mc_currency !== order.currency) {
-                     console.error(`[IPN] Currency mismatch for Order ID ${invoice}. Expected: ${order.currency}, Received: ${mc_currency}`);
-                     return; 
-                }
-                if (parseFloat(mc_gross) !== parseFloat(order.total_amount)) {
-                     console.error(`[IPN] Amount mismatch for Order ID ${invoice}. Expected: ${order.total_amount}, Received: ${mc_gross}`);
-                     return; 
-                }
-                if (custom !== order.digest) {
-                     console.error(`[IPN] Digest mismatch for Order ID ${invoice}. Transaction may be tampered.`);
-                     await connection.query('UPDATE orders SET status = ? WHERE order_id = ?', ['INVALID_DIGEST', invoice]);
-                     return; 
-                }
-
-                // ALL CHECKS PASSED - Update order status
-                console.log(`[IPN] All checks passed for Order ID ${invoice}. Updating status to COMPLETED.`);
-                await connection.query(
-                    'UPDATE orders SET status = ?, paypal_txn_id = ? WHERE order_id = ?',
-                    ['COMPLETED', txn_id, invoice]
-                );
-                console.log(`[IPN] Order ID ${invoice} successfully marked as COMPLETED.`);
-
-            } catch (dbError) {
-                 console.error('[IPN] Database error during verification:', dbError);
-            } finally {
-                 if (connection) {
-                    console.log(`[IPN] Releasing DB connection for order ${invoice}.`); // Add log
-                    connection.release();
-                 }
-            }
-
-        } else if (paypalRes === 'INVALID') {
-            console.error('[IPN] INVALID response from PayPal. IPN data may be fraudulent.');
-        } else {
-             console.warn('[IPN] Received unexpected verification response from PayPal:', paypalRes);
+        } catch (verificationError) {
+            console.error('[IPN] Error during async verification process:', verificationError);
         }
+    })(); // Immediately invoke the async function
 
-    } catch (verificationError) {
-         console.error('[IPN] Error during verification process:', verificationError);
-    }
 });
 
 // =========================================================================
