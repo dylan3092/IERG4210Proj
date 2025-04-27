@@ -522,8 +522,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }
                     console.log('[Checkout] paypal-items-container innerHTML:', document.getElementById('paypal-items-container')?.innerHTML);
 
-                    // 4. Clear local cart
-                    cart.clear(); 
+                    // 4. Clear local cart -- REMOVED THIS STEP as page navigation handles it
+                    // cart.clear(); 
 
                     // 5. Submit PayPal form using a temporary submit button
                     console.log('Order validated (ID:', result.orderId, '). Preparing to submit to PayPal...');
