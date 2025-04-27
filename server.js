@@ -467,7 +467,8 @@ app.post('/api/paypal-ipn', express.raw({ type: 'application/x-www-form-urlencod
                     'Content-Length': verificationBody.length,
                     'Connection': 'close',
                     'Host': 'ipnpb.sandbox.paypal.com', // Explicitly set Host header
-                    'User-Agent': 'NodeJS-IPN-Verification' // Add a User-Agent
+                    'User-Agent': 'NodeJS-IPN-Verification', // Add a User-Agent
+                    'Accept': '*/*' // Explicitly set Accept header
                 }
             };
 
