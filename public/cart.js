@@ -532,8 +532,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }
                     console.log('[Checkout] paypal-items-container innerHTML:', document.getElementById('paypal-items-container')?.innerHTML);
 
-                    // 4. Clear local cart (as per requirement #3)
-                    cart.clear(); 
+                    // 4. Clear local cart - REMOVED AGAIN - Cannot reliably clear after submit, and clearing before breaks payload.
+                    // cart.clear(); 
 
                     // 5. Submit PayPal form using a temporary submit button
                     console.log('Order validated (ID:', result.orderId, '). Preparing to submit to PayPal...');
