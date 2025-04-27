@@ -240,58 +240,41 @@ class ShoppingCart {
 
 // Function to update hidden fields in the PayPal form
 function updatePaypalFormFields(cartItems) {
-    const form = document.getElementById('paypal-cart-form');
-    if (!form) {
-        console.error("PayPal form 'paypal-cart-form' not found!");
-        return;
+    const MAX_PAYPAL_ITEMS = 10; // Set a reasonable limit
+    const itemsArray = Object.values(cartItems);
+
+    for (let i = 0; i < MAX_PAYPAL_ITEMS; i++) {
+        const itemNumber = i + 1;
+        const item = itemsArray[i]; // Get the item for this slot, if it exists
+
+        // Find the placeholder inputs by ID
+        const nameInput = document.getElementById(`paypal-item_name_${itemNumber}`);
+        const numberInput = document.getElementById(`paypal-item_number_${itemNumber}`);
+        const quantityInput = document.getElementById(`paypal-quantity_${itemNumber}`);
+        const amountInput = document.getElementById(`paypal-amount_${itemNumber}`);
+
+        // If inputs exist, update their values or clear them
+        if (nameInput && numberInput && quantityInput && amountInput) {
+            if (item) {
+                // Item exists for this slot, update values
+                nameInput.value = item.name;
+                numberInput.value = item.productId;
+                quantityInput.value = item.quantity;
+                amountInput.value = item.price.toFixed(2);
+                // Log for verification
+                // console.log(`[updatePaypalFormFields] Updated values for item ${itemNumber}`);
+            } else {
+                // No item for this slot, clear values
+                nameInput.value = '';
+                numberInput.value = '';
+                quantityInput.value = '';
+                amountInput.value = '';
+            }
+        } else {
+            // Optional: Log if placeholders are missing for some reason
+             // console.warn(`Placeholder inputs not found for item number ${itemNumber}`);
+        }
     }
-
-    // --- Remove fields added previously directly under the form ---
-    const previousItems = form.querySelectorAll('input[name^="item_"], input[name^="quantity_"], input[name^="amount_"]');
-    previousItems.forEach(input => input.remove());
-    // --- End removal ---
-
-    // Loop through cart items (expecting CartItem instances)
-    Object.values(cartItems).forEach((item, index) => {
-        const itemNumber = index + 1; // PayPal item index starts from 1
-
-        // --- Create item_name_X ---
-        const nameInput = document.createElement('input');
-        nameInput.type = 'hidden';
-        nameInput.name = `item_name_${itemNumber}`;
-        nameInput.value = item.name; // Assuming item.name exists
-        // Append directly to the form element
-        form.appendChild(nameInput);
-
-        // --- Create item_number_X (using Product ID) ---
-        const numberInput = document.createElement('input');
-        numberInput.type = 'hidden';
-        numberInput.name = `item_number_${itemNumber}`;
-        numberInput.value = item.productId; // Assuming item.productId exists
-        // Append directly to the form element
-        form.appendChild(numberInput);
-
-        // --- Create quantity_X ---
-        const quantityInput = document.createElement('input');
-        quantityInput.type = 'hidden';
-        quantityInput.name = `quantity_${itemNumber}`;
-        quantityInput.value = item.quantity; // Assuming item.quantity exists
-        // Append directly to the form element
-        form.appendChild(quantityInput);
-
-        // --- Create amount_X (Price per item) ---
-        const amountInput = document.createElement('input');
-        amountInput.type = 'hidden';
-        amountInput.name = `amount_${itemNumber}`;
-        // Ensure price is formatted correctly (e.g., 2 decimal places)
-        // Assuming item.price is the price per single unit
-        console.log(`[updatePaypalFormFields] Item ${itemNumber} (PID: ${item.productId}) Price: ${item.price}, Type: ${typeof item.price}`); // Log price before formatting
-        const formattedAmount = item.price.toFixed(2);
-        amountInput.value = formattedAmount;
-        console.log(`[updatePaypalFormFields] Setting amount_${itemNumber} hidden field value to: ${formattedAmount}`); // Log value being set
-        // Append directly to the form element
-        form.appendChild(amountInput);
-    });
 }
 
 // Cart UI Controller
