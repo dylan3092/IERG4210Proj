@@ -426,23 +426,31 @@ app.use('/js', express.static('public/js'));
 // == SPECIAL ROUTES (Define BEFORE global body parsers/CSRF if they have specific needs)
 // =========================================================================
 
+// Function to capture raw body for IPN verification
+const captureRawBody = (req, res, buf, encoding) => {
+    if (buf && buf.length) {
+        req.rawBody = buf.toString(encoding || 'utf8');
+    } else {
+        req.rawBody = '';
+    }
+};
+
 // PAYPAL IPN HANDLER (Needs x-www-form-urlencoded, define before global JSON parser)
-// Restore the full IPN handler logic
-app.post('/api/paypal-ipn', express.urlencoded({ extended: true }), async (req, res) => {
-    console.log('[IPN] Received notification:', req.body); // Keep this initial log
+app.post('/api/paypal-ipn', express.urlencoded({ extended: true, verify: captureRawBody }), async (req, res) => {
+    console.log('[IPN] Received notification. Parsed body:', req.body);
+    console.log('[IPN] Raw body received:', req.rawBody);
 
     // Respond to PayPal immediately with 200 OK to acknowledge receipt
     res.status(200).send('OK'); 
 
     // --- Asynchronously verify the IPN --- 
-    // 1. Construct verification request body
-    let verificationBody = 'cmd=_notify-verify';
-    for (const key in req.body) {
-        if (req.body.hasOwnProperty(key)) {
-            verificationBody += `&${key}=${encodeURIComponent(req.body[key])}`;
-        }
+    // 1. Construct verification request body using the RAW body
+    if (!req.rawBody) {
+        console.error('[IPN] Verification failed: Raw body was empty.');
+        return; // Cannot verify without raw body
     }
-
+    let verificationBody = `cmd=_notify-verify&${req.rawBody}`;
+    
     // 2. Send verification request back to PayPal Sandbox
     const options = {
         hostname: 'ipnpb.sandbox.paypal.com', // Sandbox verification URL
@@ -469,6 +477,8 @@ app.post('/api/paypal-ipn', express.urlencoded({ extended: true }), async (req, 
                 reject(e);
             });
 
+            console.log('[IPN] Sending verification request body (length):', verificationBody.length);
+            // console.log('[IPN] Verification body being sent:', verificationBody); // Optional: Log full body if needed, careful with sensitive data
             verificationReq.write(verificationBody);
             verificationReq.end();
         });
