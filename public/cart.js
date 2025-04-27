@@ -279,6 +279,15 @@ function updatePaypalFormFields(cartItems) {
         quantityInput.name = `quantity_${itemNumber}`;
         quantityInput.value = item.quantity; // Assuming item.quantity exists
         itemContainer.appendChild(quantityInput);
+
+        // --- Create amount_X (Price per item) ---
+        const amountInput = document.createElement('input');
+        amountInput.type = 'hidden';
+        amountInput.name = `amount_${itemNumber}`;
+        // Ensure price is formatted correctly (e.g., 2 decimal places)
+        // Assuming item.price is the price per single unit
+        amountInput.value = item.price.toFixed(2);
+        itemContainer.appendChild(amountInput);
     });
 }
 
