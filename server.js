@@ -453,15 +453,13 @@ app.post('/api/paypal-ipn', express.raw({ type: 'application/x-www-form-urlencod
     // Use IIFE for async verification
     (async () => {
         try {
-            // 1. Construct verification request body using URLSearchParams for robustness
-            const originalParams = new URLSearchParams(rawBodyString);
-            const verificationParams = new URLSearchParams();
-            verificationParams.set('cmd', '_notify-verify');
-            originalParams.forEach((value, key) => {
-                verificationParams.append(key, value);
-            });
-            let verificationBody = verificationParams.toString();
+            // 1. Construct verification request body - REVERTING to simple string concatenation
+            const originalParams = new URLSearchParams(rawBodyString); // Keep parsing for later use
+            let verificationBody = `cmd=_notify-verify&${rawBodyString}`; // Revert to this
             
+            // Log the exact body being sent for verification
+            console.log('[IPN] Sending verification POST body:', verificationBody);
+
             // 2. Send verification request back to PayPal Sandbox
             const options = {
                 hostname: 'www.sandbox.paypal.com',  // Try main sandbox endpoint
