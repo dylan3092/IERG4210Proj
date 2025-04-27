@@ -9,7 +9,7 @@
 ## Acknowledgement
 
 
-I acknowledge the use of [Perplexity] to generate code towards the completion of the project.
+I acknowledge the use of [Perplexity, gemini-2.5-pro] to generate code towards the completion of the project.
 
 
 **(Note that the code in this example does not achieve what we expect.)**

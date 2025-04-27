@@ -458,17 +458,17 @@ app.post('/api/paypal-ipn', express.raw({ type: 'application/x-www-form-urlencod
             
             // 2. Send verification request back to PayPal Sandbox
             const options = {
-                hostname: 'ipnpb.sandbox.paypal.com', 
+                hostname: 'www.sandbox.paypal.com',  // Try main sandbox endpoint
                 port: 443,
                 path: '/cgi-bin/webscr',
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8', // Explicitly add charset
                     'Content-Length': verificationBody.length,
                     'Connection': 'close',
-                    'Host': 'ipnpb.sandbox.paypal.com', // Explicitly set Host header
-                    'User-Agent': 'NodeJS-IPN-Verification', // Add a User-Agent
-                    'Accept': '*/*' // Explicitly set Accept header
+                    'Host': 'www.sandbox.paypal.com', // Host should match hostname
+                    'User-Agent': 'NodeJS-IPN-Verification',
+                    'Accept': '*/*'
                 }
             };
 
