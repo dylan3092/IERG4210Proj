@@ -524,11 +524,24 @@ document.addEventListener('DOMContentLoaded', async () => {
                     // 4. Clear local cart
                     cart.clear(); 
 
-                    // 5. Submit PayPal form (with a tiny delay for DOM updates)
-                    console.log('Order validated and created (ID:', result.orderId, '). Submitting to PayPal...');
+                    // 5. Submit PayPal form using a temporary submit button
+                    console.log('Order validated and created (ID:', result.orderId, '). Preparing to submit to PayPal...');
+                    
+                    // Create a temporary submit button
+                    const tempSubmitButton = document.createElement('button');
+                    tempSubmitButton.type = 'submit';
+                    tempSubmitButton.style.display = 'none'; // Hide it
+                    
+                    // Append it to the form
+                    paypalForm.appendChild(tempSubmitButton);
+                    
+                    // Use setTimeout to ensure button is registered before click
                     setTimeout(() => {
-                        paypalForm.submit();
-                    }, 20000); // Increased delay to 200ms for testing
+                        console.log('Clicking temporary submit button...');
+                        tempSubmitButton.click(); // Click the hidden button
+                        // Optional: Remove the button after clicking (though page navigation will likely happen first)
+                        // paypalForm.removeChild(tempSubmitButton);
+                    }, 200); // Keep a small delay just in case
 
                 } else {
                     // Handle errors from the server
