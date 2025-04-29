@@ -1,3 +1,7 @@
+// Initialize Stripe (Replace with your actual publishable key)
+// IMPORTANT: Make sure Stripe.js script is included in your HTML before this script.
+const stripe = Stripe('pk_test_51RJCbCGfdrXt5LBwGqH6Hot5HdIrIQOHEs0EpGKoHEcf7EMG9QVJXzPoarHjzjNJhkV6eGDUbnQhhRG6ar0AU8Oc00ToxczFqW'); 
+
 // OOP implementation of Shopping Cart
 class CartItem {
     constructor(productId, name, price, quantity = 1, image = null) {
@@ -238,55 +242,6 @@ class ShoppingCart {
     }
 }
 
-// Function to update hidden fields in the PayPal form
-function updatePaypalFormFields(cartItems) {
-    const form = document.getElementById('paypal-cart-form');
-    if (!form) {
-        console.error("PayPal form 'paypal-cart-form' not found!");
-        return;
-    }
-
-    // --- Remove fields added previously directly under the form ---
-    const previousItems = form.querySelectorAll('input[name^="item_"], input[name^="quantity_"], input[name^="amount_"]');
-    previousItems.forEach(input => input.remove());
-    // --- End removal ---
-
-    // Loop through cart items (expecting CartItem instances)
-    Object.values(cartItems).forEach((item, index) => {
-        const itemNumber = index + 1; // PayPal item index starts from 1
-
-        // --- Create item_name_X ---
-        const nameInput = document.createElement('input');
-        nameInput.type = 'hidden';
-        nameInput.name = `item_name_${itemNumber}`;
-        nameInput.value = item.name; // Assuming item.name exists
-        form.appendChild(nameInput); // Append directly to form
-
-        // --- Create item_number_X (using Product ID) ---
-        const numberInput = document.createElement('input');
-        numberInput.type = 'hidden';
-        numberInput.name = `item_number_${itemNumber}`;
-        numberInput.value = item.productId; // Assuming item.productId exists
-        form.appendChild(numberInput); // Append directly to form
-
-        // --- Create quantity_X ---
-        const quantityInput = document.createElement('input');
-        quantityInput.type = 'hidden';
-        quantityInput.name = `quantity_${itemNumber}`;
-        quantityInput.value = item.quantity; // Assuming item.quantity exists
-        form.appendChild(quantityInput); // Append directly to form
-
-        // --- Create amount_X (Price per item) ---
-        const amountInput = document.createElement('input');
-        amountInput.type = 'hidden';
-        amountInput.name = `amount_${itemNumber}`;
-        const formattedAmount = item.price.toFixed(2);
-        amountInput.value = formattedAmount;
-        form.appendChild(amountInput); // Append directly to form
-        // console.log(`[updatePaypalFormFields] Added fields for item ${itemNumber}`);
-    });
-}
-
 // Cart UI Controller
 class CartUIController {
     constructor(cart) {
@@ -304,6 +259,13 @@ class CartUIController {
         
         // Initialize UI
         this.initializeUI();
+        
+        // Add event listener for the checkout button
+        if (this.checkoutBtn) {
+            this.checkoutBtn.addEventListener('click', () => this.handleCheckout());
+        } else {
+            console.error("Checkout button (#checkout-btn) not found!");
+        }
     }
 
     initializeUI() {
@@ -370,8 +332,6 @@ class CartUIController {
         const newTotal = this.cart.getTotal();
         this.animateValue(this.cartTotal, currentTotal, newTotal, 300);
         
-        // ** Add call to update PayPal hidden fields **
-        updatePaypalFormFields(this.cart.items);
         console.log("[CartUIController.updateDisplay] Finished updating display."); // Log display update end
         
         // Add event listeners to new quantity inputs and remove buttons
@@ -440,6 +400,80 @@ class CartUIController {
         const sanitizedProductId = sanitize.html(productId);
         if (this.cart.items[sanitizedProductId]) {
             this.cart.removeItem(sanitizedProductId);
+        }
+    }
+
+    // Add this method to handle Stripe Checkout
+    async handleCheckout() {
+        console.log("[CartUIController.handleCheckout] Checkout button clicked.");
+        this.checkoutBtn.disabled = true; // Disable button during processing
+        this.checkoutBtn.textContent = 'Processing...';
+
+        // 1. Get cart items from the cart object
+        const cartItemsForApi = Object.values(this.cart.items).map(item => ({
+            pid: item.productId,
+            quantity: item.quantity
+        }));
+
+        if (cartItemsForApi.length === 0) {
+            alert('Your cart is empty.');
+            this.checkoutBtn.disabled = false;
+            this.checkoutBtn.textContent = 'Checkout';
+            return;
+        }
+
+        const cartData = {
+            items: cartItemsForApi
+        };
+
+        try {
+            // 2. Call backend to create the Stripe Checkout session
+            console.log("[CartUIController.handleCheckout] Sending request to /api/create-checkout-session with data:", cartData);
+            const response = await fetch('/api/create-checkout-session', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    // Add CSRF token if your endpoint requires it (check server.js configuration)
+                    // 'X-CSRF-Token': sessionStorage.getItem('csrfToken') 
+                },
+                body: JSON.stringify(cartData),
+            });
+
+            console.log("[CartUIController.handleCheckout] Received response status:", response.status);
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({ error: response.statusText })); // Handle non-JSON errors
+                console.error('[CartUIController.handleCheckout] Failed to create checkout session:', errorData.error);
+                alert(`Error preparing checkout: ${errorData.error || 'Please try again.'}`);
+                this.checkoutBtn.disabled = false;
+                this.checkoutBtn.textContent = 'Checkout';
+                return;
+            }
+
+            const { sessionId } = await response.json();
+            console.log("[CartUIController.handleCheckout] Received Stripe session ID:", sessionId);
+
+            // 3. Redirect to Stripe Checkout
+            console.log("[CartUIController.handleCheckout] Redirecting to Stripe Checkout...");
+            const { error } = await stripe.redirectToCheckout({
+                sessionId: sessionId
+            });
+
+            // If redirectToCheckout fails (e.g., network error, user cancels), display error
+            if (error) {
+                console.error('[CartUIController.handleCheckout] Stripe redirectToCheckout error:', error);
+                alert(error.message);
+                this.checkoutBtn.disabled = false; // Re-enable button on client-side errors
+                this.checkoutBtn.textContent = 'Checkout';
+            }
+            // If redirect is successful, the user leaves this page.
+            // Consider clearing the cart here OR on the success page.
+            // this.cart.clear(); 
+
+        } catch (error) {
+            console.error('[CartUIController.handleCheckout] Checkout error:', error);
+            alert('An unexpected error occurred during checkout. Please check the console.');
+            this.checkoutBtn.disabled = false; // Re-enable button on unexpected errors
+            this.checkoutBtn.textContent = 'Checkout';
         }
     }
 }

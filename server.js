@@ -15,6 +15,7 @@ const multer = require('multer');
 const crypto = require('crypto');
 const xss = require('xss');
 const https = require('https'); // Also import https at the top
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY); // <<<<<< ADD STRIPE
 
 const app = express();
 
@@ -424,168 +425,151 @@ app.use('/js', express.static('public/js'));
 // == SPECIAL ROUTES (Define BEFORE global body parsers if they have specific needs)
 // =========================================================================
 
-// PAYPAL IPN HANDLER - Use express.raw() BEFORE global parsers
-app.post('/api/paypal-ipn', express.raw({ type: 'application/x-www-form-urlencoded', limit: '10mb' }), (req, res) => {
-    // By using express.raw, req.body should *be* the raw Buffer
-    const rawBodyBuffer = req.body;
-    console.log(`[IPN Handler] Received raw buffer, length: ${rawBodyBuffer?.length}`);
+// STRIPE WEBHOOK HANDLER - Use express.raw() BEFORE global parsers
+app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+    const sig = req.headers['stripe-signature'];
+    // Make sure to set STRIPE_WEBHOOK_SECRET in your .env file
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
-    // Respond to PayPal immediately
-    res.status(200).send('OK');
-
-    // --- Process IPN verification --- 
-    if (!rawBodyBuffer || rawBodyBuffer.length === 0) {
-        console.error('[IPN] Verification failed: Raw body buffer was empty or missing.');
-        return;
+    if (!webhookSecret) {
+        console.error('[Stripe Webhook] Error: STRIPE_WEBHOOK_SECRET not set in environment variables.');
+        return res.status(500).send('Webhook configuration error.');
     }
-    
-    // Convert buffer to string, trimming whitespace, explicitly using utf8
-    const rawBodyString = rawBodyBuffer.toString('utf8').trim();
-    console.log('[IPN] Raw body string (trimmed):', rawBodyString);
 
-    // Manually parse the necessary fields from the raw string for later use
-    const parsedParams = new URLSearchParams(rawBodyString);
-    const parsedBodyCopy = {};
-    parsedParams.forEach((value, key) => { parsedBodyCopy[key] = value; });
-    console.log('[IPN] Manually parsed body for checks:', parsedBodyCopy);
+    let event;
 
-    // Use IIFE for async verification
-    (async () => {
-        try {
-            // 1. Construct verification request body using simple concatenation
-            let verificationBody = `cmd=_notify-verify&${rawBodyString}`;
-            
-            // Calculate Content-Length accurately using bytes
-            const bodyByteLength = Buffer.byteLength(verificationBody, 'utf8');
+    try {
+        // Use the raw body buffer received
+        event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+    } catch (err) {
+        console.error(`[Stripe Webhook] Signature verification failed: ${err.message}`);
+        console.error(`[Stripe Webhook] Signature Header: ${sig}`);
+        return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
 
-            console.log('[IPN] Sending verification POST body:', verificationBody);
-            console.log(`[IPN] Calculated verification body byte length: ${bodyByteLength}`);
+    console.log(`[Stripe Webhook] Received event: ${event.type}, ID: ${event.id}`);
 
-            // 2. Send verification request back to PayPal Sandbox
-            const options = {
-                hostname: 'www.sandbox.paypal.com', 
-                port: 443,
-                path: '/cgi-bin/webscr',
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8', 
-                    'Content-Length': bodyByteLength, // Use accurate byte length
-                    'Connection': 'close',
-                    'Host': 'www.sandbox.paypal.com', 
-                    'User-Agent': 'NodeJS-IPN-Verification/1.1', // Slightly updated UA
-                    'Accept': '*/*'
-                }
-            };
-            
-            // Log the options being used
-            console.log('[IPN] HTTPS Request Options:', JSON.stringify(options, null, 2));
+    // Handle the event
+    switch (event.type) {
+        case 'checkout.session.completed':
+            const session = event.data.object;
+            console.log(`[Stripe Webhook] Checkout Session Completed for ID: ${session.id}`);
 
-            const paypalRes = await new Promise((resolve, reject) => {
-                const verificationReq = https.request(options, (paypalRes) => {
-                    let data = '';
-                    paypalRes.setEncoding('utf8'); // Ensure response is also treated as UTF-8
-                    paypalRes.on('data', (chunk) => { data += chunk; });
-                    paypalRes.on('end', () => resolve(data));
-                });
-                verificationReq.on('error', (e) => {
-                    console.error('[IPN] Verification request error:', e);
-                    reject(e);
-                });
-                verificationReq.write(verificationBody);
-                verificationReq.end();
-            });
+            // --- Fulfillment Logic ---
+            // Retrieve orderId from metadata
+            const orderId = parseInt(session.metadata?.orderId, 10); // Use optional chaining
+            const paymentIntentId = session.payment_intent; // Can store this
 
-            console.log('[IPN] Verification response from PayPal:', paypalRes);
-
-            // 3. Process Verification Result (using manually parsed parsedBodyCopy)
-            if (paypalRes === 'VERIFIED') {
-                console.log('[IPN] VERIFIED. Processing payment data...');
-                const { 
-                    invoice, custom, txn_id, payment_status, mc_gross, mc_currency, receiver_email 
-                } = parsedBodyCopy; // Use the manually parsed body
-
-                // Basic checks
-                if (!invoice || !custom || !txn_id) {
-                     console.error('[IPN] Missing critical fields (invoice, custom, or txn_id).');
-                     return; // Stop processing
-                }
-
-                // Fetch original order details from DB
-                let connection;
-                try {
-                    connection = await pool.getConnection();
-                    console.log(`[IPN] Checking database for Order ID: ${invoice}`); // Add log
-                    const [orders] = await connection.query('SELECT * FROM orders WHERE order_id = ?', [invoice]);
-                    
-                    if (orders.length === 0) {
-                        console.error(`[IPN] Order ID ${invoice} not found in database.`);
-                        return; // Stop processing
-                    }
-                    const order = orders[0];
-                    console.log(`[IPN] Found order:`, order); // Add log
-
-                    // Perform validation checks
-                    console.log(`[IPN] Validating order data...`); // Add log
-                    if (order.status === 'COMPLETED') {
-                        console.warn(`[IPN] Transaction ${txn_id} for Order ID ${invoice} already processed.`);
-                        return; // Prevent double processing
-                    }
-                    if (payment_status !== 'Completed') {
-                        console.warn(`[IPN] Payment status for Order ID ${invoice} is '${payment_status}', not 'Completed'. Ignoring.`);
-                        return; 
-                    }
-                    const expectedEmail = process.env.PAYPAL_BUSINESS_EMAIL || 'sb-43rt9j39948135@business.example.com'; // Corrected default email based on logs
-                    if (receiver_email !== expectedEmail) {
-                        console.error(`[IPN] Receiver email mismatch for Order ID ${invoice}. Expected: ${expectedEmail}, Received: ${receiver_email}`);
-                        return; 
-                    }
-                    if (mc_currency !== order.currency) {
-                         console.error(`[IPN] Currency mismatch for Order ID ${invoice}. Expected: ${order.currency}, Received: ${mc_currency}`);
-                         return; 
-                    }
-                    if (parseFloat(mc_gross) !== parseFloat(order.total_amount)) {
-                         console.error(`[IPN] Amount mismatch for Order ID ${invoice}. Expected: ${order.total_amount}, Received: ${mc_gross}`);
-                         return; 
-                    }
-                    if (custom !== order.digest) {
-                         console.error(`[IPN] Digest mismatch for Order ID ${invoice}. Transaction may be tampered.`);
-                         await connection.query('UPDATE orders SET status = ? WHERE order_id = ?', ['INVALID_DIGEST', invoice]);
-                         return; 
-                    }
-
-                    // ALL CHECKS PASSED - Update order status
-                    console.log(`[IPN] All checks passed for Order ID ${invoice}. Updating status to COMPLETED.`);
-                    await connection.query(
-                        'UPDATE orders SET status = ?, paypal_txn_id = ? WHERE order_id = ?',
-                        ['COMPLETED', txn_id, invoice]
-                    );
-                    console.log(`[IPN] Order ID ${invoice} successfully marked as COMPLETED.`);
-
-                } catch (dbError) {
-                     console.error('[IPN] Database error during verification:', dbError);
-                } finally {
-                     if (connection) {
-                        console.log(`[IPN] Releasing DB connection for order ${invoice}.`); // Add log
-                        connection.release();
-                     }
-                }
-
-            } else if (paypalRes === 'INVALID') {
-                 console.error('[IPN] INVALID response from PayPal. IPN data may be fraudulent.');
-            } else {
-                 console.warn('[IPN] Received unexpected verification response from PayPal:', paypalRes);
+            if (!orderId) {
+                console.error('[Stripe Webhook] Error: Missing orderId in session metadata!', session.metadata);
+                // Don't give potentially sensitive info back to caller
+                return res.status(400).send('Webhook Error: Missing required metadata.');
             }
-        } catch (verificationError) {
-            console.error('[IPN] Error during async verification process:', verificationError);
-        }
-    })();
+            if (!paymentIntentId) {
+                 console.error('[Stripe Webhook] Error: Missing payment_intent in session!', session);
+                 return res.status(400).send('Webhook Error: Missing payment intent.');
+            }
+
+            let connection;
+            try {
+                connection = await pool.getConnection();
+                await connection.beginTransaction(); // Start transaction for update safety
+
+                // Check if order exists and is PENDING
+                const [orders] = await connection.query('SELECT * FROM orders WHERE order_id = ? FOR UPDATE', [orderId]);
+                if (orders.length === 0) {
+                     console.error(`[Stripe Webhook] Order ID ${orderId} not found.`);
+                     await connection.rollback();
+                     return res.status(404).send('Order not found.'); // Changed status code
+                }
+                const order = orders[0];
+
+                // Check if already processed (idempotency)
+                if (order.status !== 'PENDING') {
+                     console.warn(`[Stripe Webhook] Order ${orderId} already processed or not pending. Status: ${order.status}.`);
+                     await connection.rollback(); // Rollback, no changes needed
+                     return res.status(200).json({ received: true, message: 'Order already processed or not in pending state.' }); // OK status, already handled
+                }
+
+                // Validate amount (optional but recommended)
+                // Stripe amount is in cents
+                const expectedAmountCents = Math.round(parseFloat(order.total_amount) * 100);
+                if (session.amount_total !== expectedAmountCents) {
+                    console.error(`[Stripe Webhook] Amount mismatch for Order ${orderId}. DB: ${order.total_amount} (${expectedAmountCents} cents), Stripe: ${session.amount_total} cents`);
+                    // Update order status to indicate error, store payment intent ID
+                    await connection.query('UPDATE orders SET status = ?, stripe_payment_intent_id = ?, stripe_session_id = ? WHERE order_id = ?', ['AMOUNT_MISMATCH', paymentIntentId, session.id, orderId]);
+                    await connection.commit(); // Commit the error status
+                    // Still return 400 as it's a processing error from webhook perspective
+                    return res.status(400).send('Amount mismatch.');
+                }
+
+                 // Validate currency (optional but recommended)
+                if (session.currency.toLowerCase() !== order.currency.toLowerCase()) {
+                    console.error(`[Stripe Webhook] Currency mismatch for Order ${orderId}. DB: ${order.currency}, Stripe: ${session.currency}`);
+                     await connection.query('UPDATE orders SET status = ?, stripe_payment_intent_id = ?, stripe_session_id = ? WHERE order_id = ?', ['CURRENCY_MISMATCH', paymentIntentId, session.id, orderId]);
+                     await connection.commit();
+                    return res.status(400).send('Currency mismatch.');
+                }
+
+                // Update order status to COMPLETED and store Stripe IDs
+                const [updateResult] = await connection.query(
+                    'UPDATE orders SET status = ?, stripe_payment_intent_id = ?, stripe_session_id = ? WHERE order_id = ? AND status = ?', // Add status check for safety
+                    ['COMPLETED', paymentIntentId, session.id, orderId, 'PENDING']
+                );
+
+                if (updateResult.affectedRows > 0) {
+                    await connection.commit(); // Commit successful update
+                    console.log(`[Stripe Webhook] Order ${orderId} marked as COMPLETED.`);
+                } else {
+                    // This case should ideally not happen due to the SELECT FOR UPDATE and status check, but good to handle
+                    console.warn(`[Stripe Webhook] Order ${orderId} status was not PENDING during update attempt, rolling back.`);
+                    await connection.rollback();
+                    return res.status(409).send('Conflict: Order status changed unexpectedly.'); // Conflict status
+                }
+
+            } catch (dbError) {
+                console.error('[Stripe Webhook] Database error during fulfillment:', dbError);
+                if (connection) await connection.rollback(); // Rollback on error
+                // Don't send 200, Stripe will retry on server errors
+                return res.status(500).send('Internal Server Error');
+            } finally {
+                if (connection) connection.release();
+            }
+            break;
+
+        case 'payment_intent.succeeded':
+            // Optional: Handle this event if needed, though checkout.session.completed is usually sufficient for Checkout flows
+            const paymentIntent = event.data.object;
+            console.log(`[Stripe Webhook] PaymentIntent Succeeded: ${paymentIntent.id}`);
+            // Could add logic here if you initiate payments differently (e.g., PaymentIntents API directly)
+            break;
+
+         case 'payment_intent.payment_failed':
+             const failedPaymentIntent = event.data.object;
+             const paymentError = failedPaymentIntent.last_payment_error;
+             console.log(`[Stripe Webhook] PaymentIntent Failed: ${failedPaymentIntent.id}, Reason: ${paymentError?.message} (Code: ${paymentError?.code})`);
+             // Optionally update order status to FAILED. Need a way to link payment_intent back to orderId
+             // This is harder if only checkout.session.completed stores the metadata reliably.
+             // Consider logging the failed checkout session ID if available on the payment intent for easier lookup.
+             // const sessionId = failedPaymentIntent.metadata?.checkout_session_id; // Check if Stripe adds this
+             // if (sessionId) { /* find order by session id and update status */ }
+             break;
+
+        // ... handle other event types as needed
+
+        default:
+            console.log(`[Stripe Webhook] Unhandled event type ${event.type}`);
+    }
+
+    // Return a 200 response to acknowledge receipt of the event
+    res.status(200).json({ received: true }); // Send JSON response as best practice
 });
 
 // =========================================================================
 // == GLOBAL MIDDLEWARE (Body Parsers, Security Headers, CORS, Logging, etc.)
 // =========================================================================
 
-// GLOBAL Body Parsers - Define AFTER special routes like IPN
+// GLOBAL Body Parsers - Define AFTER special routes like webhook
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -1590,70 +1574,72 @@ app.get('/api/auth/status', (req, res) => {
 });
 
 // =========================================================================
-// == ORDER CREATION API (/api/create-order)
+// == ORDER CREATION API (/api/create-checkout-session) - REPLACES /api/create-order
 // =========================================================================
-app.post('/api/create-order', authUtils.authenticate, async (req, res) => {
-    const userId = req.session.userId; 
-    const userEmail = req.session.userEmail; 
-    console.log(`[create-order] Starting order creation for user: ${userEmail} (ID: ${userId})`); // Log start
+// Rename endpoint for clarity
+app.post('/api/create-checkout-session', authUtils.authenticate, async (req, res) => {
+    const userId = req.session.userId;
+    const userEmail = req.session.userEmail;
+    console.log(`[create-checkout] Starting session creation for user: ${userEmail} (ID: ${userId})`); // Log start
 
     // 1. Validate Incoming Data
-    const cartItems = req.body.items; 
-    console.log('[create-order] Raw cart items received:', cartItems); // Log input
+    const cartItems = req.body.items;
+    console.log('[create-checkout] Raw cart items received:', cartItems); // Log input
     if (!Array.isArray(cartItems) || cartItems.length === 0) {
         return res.status(400).json({ error: 'Invalid or empty cart data.' });
     }
 
+    // Reuse existing validation logic
     const validatedItemsInput = cartItems.map(item => ({
-        pid: parseInt(item.pid), // Ensure pid is integer
-        quantity: parseInt(item.quantity) // Ensure quantity is integer
-    })).filter(item => 
+        pid: parseInt(item.pid),
+        quantity: parseInt(item.quantity)
+    })).filter(item =>
         !isNaN(item.pid) && item.pid > 0 &&
-        !isNaN(item.quantity) && item.quantity > 0 && item.quantity <= 100 // Add reasonable max quantity
+        !isNaN(item.quantity) && item.quantity > 0 && item.quantity <= 100
     );
 
     if (validatedItemsInput.length !== cartItems.length) {
-        console.warn('Some cart items failed basic validation:', cartItems, validatedItemsInput);
+        console.warn('[create-checkout] Some cart items failed basic validation:', cartItems, validatedItemsInput);
         return res.status(400).json({ error: 'Invalid item data in cart (PID or quantity).' });
     }
-    
+
     const pids = validatedItemsInput.map(item => item.pid);
-    console.log('[create-order] Validated PIDs:', pids); // Log validated PIDs
+    console.log('[create-checkout] Validated PIDs:', pids); // Log validated PIDs
     if (pids.length === 0) {
          return res.status(400).json({ error: 'No valid items found in cart.' });
     }
 
     let connection;
     try {
-        console.log('[create-order] Attempting to get DB connection...'); // Log connection attempt
+        console.log('[create-checkout] Attempting to get DB connection...');
         connection = await pool.getConnection();
-        console.log('[create-order] DB connection obtained. Starting transaction...'); // Log connection success
+        console.log('[create-checkout] DB connection obtained. Starting transaction...');
         await connection.beginTransaction();
-        console.log('[create-order] Transaction started.'); // Log transaction start
+        console.log('[create-checkout] Transaction started.');
 
-        // 2. Fetch Product Details & Calculate Total from DB
+        // 2. Fetch Product Details & Calculate Total from DB (Same as before)
         const placeholders = pids.map(() => '?').join(',');
-        const sql = `SELECT pid, name, price FROM products WHERE pid IN (${placeholders})`;
-        console.log('[create-order] Fetching product details with SQL:', sql, pids); // Log product fetch query
+        const sql = `SELECT pid, name, price, description, thumbnail FROM products WHERE pid IN (${placeholders})`; // Fetch more details for Stripe
+        console.log('[create-checkout] Fetching product details with SQL:', sql, pids);
         const [productsFromDb] = await connection.query(sql, pids);
-        console.log('[create-order] Products fetched from DB:', productsFromDb); // Log fetched products
+        console.log('[create-checkout] Products fetched from DB:', productsFromDb);
 
         if (productsFromDb.length !== pids.length) {
-             console.error('[create-order] DB Fetch Error: Not all product IDs found. Rolling back.', pids, productsFromDb);
-             await connection.rollback(); 
+             console.error('[create-checkout] DB Fetch Error: Not all product IDs found. Rolling back.', pids, productsFromDb);
+             await connection.rollback();
              return res.status(404).json({ error: 'One or more products not found.' });
         }
 
         let totalAmount = 0;
-        const finalOrderItems = []; 
+        const finalOrderItems = [];
         const productMap = new Map(productsFromDb.map(p => [p.pid, p]));
 
-        console.log('[create-order] Calculating total and preparing final items...'); // Log calculation start
+        console.log('[create-checkout] Calculating total and preparing final items...');
         for (const inputItem of validatedItemsInput) {
             const product = productMap.get(inputItem.pid);
             if (!product) {
-                 console.error('[create-order] Consistency Error: Product missing from map', inputItem.pid);
-                 await connection.rollback(); 
+                 console.error('[create-checkout] Consistency Error: Product missing from map', inputItem.pid);
+                 await connection.rollback();
                  return res.status(500).json({ error: 'Internal server error during price validation.' });
             }
             const priceFromDb = parseFloat(product.price);
@@ -1663,71 +1649,116 @@ app.post('/api/create-order', authUtils.authenticate, async (req, res) => {
             finalOrderItems.push({
                 pid: inputItem.pid,
                 quantity: inputItem.quantity,
-                name: product.name, // Needed for PayPal form later? Maybe not needed for digest itself
+                name: product.name, // Needed for Stripe line item
+                description: product.description, // Optional for Stripe
+                thumbnail: product.thumbnail, // Optional for Stripe
                 price_at_purchase: priceFromDb
             });
         }
-        console.log('[create-order] Total calculated:', totalAmount, 'Final items:', finalOrderItems); // Log calculation end
+        // Ensure total amount has max 2 decimal places
+        totalAmount = parseFloat(totalAmount.toFixed(2));
+        console.log('[create-checkout] Total calculated:', totalAmount, 'Final items:', finalOrderItems);
 
-        // 3. Generate Salt and Digest
-        const currency = 'HKD'; 
-        const merchantEmail = process.env.PAYPAL_BUSINESS_EMAIL || 'sb-43rt9j39948135@business.example.com'; 
-        const salt = crypto.randomBytes(16).toString('hex');
-        const digestData = JSON.stringify({
-            currency,
-            merchant: merchantEmail,
-            salt,
-            items: finalOrderItems.map(item => ({
-                 pid: item.pid, 
-                 qty: item.quantity, 
-                 price: item.price_at_purchase 
-            })).sort((a, b) => a.pid - b.pid),
-            total: totalAmount.toFixed(2)
-        });
-        const digest = crypto.createHash('sha256').update(digestData).digest('hex');
-        console.log('[create-order] Salt and Digest generated:', { salt, digest }); // Log digest generation
-
-        // 4. Store Order in DB
-        const orderSql = 'INSERT INTO orders (user_id, user_email, total_amount, currency, salt, digest, status) VALUES (?, ?, ?, ?, ?, ?, ?)';
-        const orderParams = [userId, userEmail, totalAmount.toFixed(2), currency, salt, digest, 'PENDING'];
-        console.log('[create-order] Inserting into orders table:', orderSql, orderParams); // Log order insert query
+        // 3. Store Order in DB (NO salt/digest anymore)
+        const currency = 'hkd'; // Ensure lowercase for Stripe API consistency
+        const orderSql = 'INSERT INTO orders (user_id, user_email, total_amount, currency, status) VALUES (?, ?, ?, ?, ?)';
+        // Use uppercase currency for DB consistency if preferred
+        const orderParams = [userId, userEmail, totalAmount, currency.toUpperCase(), 'PENDING'];
+        console.log('[create-checkout] Inserting into orders table:', orderSql, orderParams);
         const [orderResult] = await connection.query(orderSql, orderParams);
         const orderId = orderResult.insertId;
-        console.log('[create-order] Order inserted successfully. Order ID:', orderId); // Log order insert success
+        console.log('[create-checkout] Order inserted successfully. Order ID:', orderId);
 
-        // Insert items into order_items
-        console.log('[create-order] Inserting order items...'); // Log item insert start
+        // Insert items into order_items (Same as before)
+        console.log('[create-checkout] Inserting order items...');
         const itemInsertPromises = finalOrderItems.map(item => {
             const itemSql = 'INSERT INTO order_items (order_id, product_id, quantity, price_at_purchase) VALUES (?, ?, ?, ?)';
             const itemParams = [orderId, item.pid, item.quantity, item.price_at_purchase.toFixed(2)];
-            // console.log('[create-order] Item SQL:', itemSql, itemParams); // Optional: Log each item query
             return connection.query(itemSql, itemParams);
         });
         await Promise.all(itemInsertPromises);
-        console.log('[create-order] Order items inserted successfully.'); // Log item insert success
+        console.log('[create-checkout] Order items inserted successfully.');
 
-        // 5. Commit Transaction
-        console.log('[create-order] Committing transaction...'); // Log commit attempt
+        // 4. Create Stripe Checkout Session
+        console.log('[create-checkout] Creating Stripe Checkout Session...');
+        // Construct line items for Stripe
+        const line_items = finalOrderItems.map(item => {
+             // Construct the image URL - *adjust path if needed*
+            const imageUrl = item.thumbnail
+                ? `${req.protocol}://${req.get('host')}/uploads/${item.thumbnail}`
+                : undefined; // Or provide a default placeholder image URL
+
+             return {
+                 price_data: {
+                    currency: currency, // Use lowercase currency for Stripe API
+                    product_data: {
+                        name: item.name,
+                         // Add description and images if available
+                        description: item.description || undefined,
+                        images: imageUrl ? [imageUrl] : undefined,
+                    },
+                    unit_amount: Math.round(item.price_at_purchase * 100), // Price in cents!
+                },
+                quantity: item.quantity,
+            };
+        });
+
+        // Define Success and Cancel URLs (using environment variables is better)
+        const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
+        const successUrl = `${baseUrl}/checkout-success.html?session_id={CHECKOUT_SESSION_ID}`;
+        const cancelUrl = `${baseUrl}/checkout-cancel.html`;
+
+        console.log('[create-checkout] Line Items for Stripe:', JSON.stringify(line_items, null, 2));
+        console.log(`[create-checkout] Success URL: ${successUrl}`);
+        console.log(`[create-checkout] Cancel URL: ${cancelUrl}`);
+
+        const session = await stripe.checkout.sessions.create({
+            payment_method_types: ['card'], // Add other methods like 'alipay', 'wechat_pay' if needed
+            line_items: line_items,
+            mode: 'payment',
+            success_url: successUrl,
+            cancel_url: cancelUrl,
+            client_reference_id: orderId.toString(), // Link Stripe session to your order ID
+            customer_email: userEmail || undefined, // Prefill email if available
+            metadata: {
+                // Store your internal order ID! Crucial for webhook fulfillment.
+                orderId: orderId.toString()
+                // Add any other relevant metadata (e.g., userId)
+            }
+            // billing_address_collection: 'required', // Uncomment to require billing address on Stripe page
+            // shipping_address_collection: { // Example for shipping
+            //    allowed_countries: ['US', 'CA', 'HK'], // Restrict countries if needed
+            // },
+        });
+
+        console.log(`[create-checkout] Stripe Session created: ${session.id}`);
+
+        // 5. Update Order with Stripe Session ID (Optional but Recommended)
+        await connection.query('UPDATE orders SET stripe_session_id = ? WHERE order_id = ?', [session.id, orderId]);
+        console.log(`[create-checkout] Order ${orderId} updated with Stripe session ID.`);
+
+        // 6. Commit Transaction
+        console.log('[create-checkout] Committing transaction...');
         await connection.commit();
-        console.log('[create-order] Transaction committed.'); // Log commit success
+        console.log('[create-checkout] Transaction committed.');
 
-        // 6. Return Order ID and Digest to Client
-        console.log('[create-order] Sending success response to client:', { orderId, digest }); // Log success response
-        res.json({ orderId: orderId, digest: digest });
+        // 7. Return Session ID to Client
+        console.log('[create-checkout] Sending session ID to client:', { sessionId: session.id });
+        res.json({ sessionId: session.id }); // Send only the session ID
 
     } catch (error) {
         // Log the specific error that occurred *before* rollback
-        console.error('[create-order] Error occurred within try block:', error); 
+        console.error('[create-checkout] Error occurred:', error);
         if (connection) {
-            console.log('[create-order] Rolling back transaction due to error.'); // Log rollback attempt
-            await connection.rollback(); 
-            console.log('[create-order] Transaction rolled back.'); // Log rollback success
+            console.log('[create-checkout] Rolling back transaction due to error.');
+            await connection.rollback();
+            console.log('[create-checkout] Transaction rolled back.');
         }
-        // The generic error response is fine, the detailed error is in the log above
-        res.status(500).json({ error: 'Failed to create order due to a server error.' });
+        // Send a generic error message to the client
+        res.status(500).json({ error: 'Failed to create checkout session due to a server error.' });
     } finally {
         if (connection) {
-            console.log('[create-order] Releasing DB connection.'); // Log connection release
+            console.log('[create-checkout] Releasing DB connection.');
             connection.release();
         }
     }

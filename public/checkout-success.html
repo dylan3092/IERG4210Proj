@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Successful!</title>
+    <link rel="stylesheet" href="styles.css"> <!-- Optional: Link your main stylesheet -->
+    <style>
+        body { padding: 20px; text-align: center; }
+        .success-message { color: green; }
+        #order-details { margin-top: 20px; text-align: left; display: inline-block; }
+    </style>
+</head>
+<body>
+    <h1>Thank You For Your Order!</h1>
+    <p class="success-message">Your payment was successful and your order is being processed.</p>
+    
+    <div id="order-details">
+        <p>Loading order details...</p>
+        <!-- Order details will be loaded here by JavaScript -->
+    </div>
+
+    <p><a href="/">Continue Shopping</a></p>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Optional: Fetch order details using session_id from URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const sessionId = urlParams.get('session_id');
+            const orderDetailsDiv = document.getElementById('order-details');
+
+            if (sessionId) {
+                // You could create a new backend endpoint like /api/order-status?session_id=XYZ
+                // that verifies the session ID belongs to the logged-in user (if applicable)
+                // and retrieves the order details from your database based on the stripe_session_id.
+                // For now, just display the session ID for confirmation.
+                orderDetailsDiv.innerHTML = `<p>Your Stripe Session ID: <strong>${sessionId}</strong></p><p>(You can use this ID to query order status later)</p>`;
+                
+                // Consider clearing the cart from localStorage now that checkout is successful
+                localStorage.removeItem('shopping_cart');
+                console.log("Cart cleared from localStorage.");
+
+            } else {
+                orderDetailsDiv.innerHTML = '<p>Could not retrieve order details (missing session ID).</p>';
+            }
+        });
+    </script>
+
+</body>
+</html> 

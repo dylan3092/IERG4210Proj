@@ -346,7 +346,7 @@ const setupUserActions = () => {
         // Remove the premature auth check and redirect based on API call
         // The server-side middleware should handle unauthorized access.
         // We still fetch CSRF token first.
-        await fetchCsrfToken(); 
+        await fetchCsrfToken();
         
         // Inject CSRF tokens into the forms
         const categoryPlaceholder = document.getElementById('csrf-category-placeholder');
@@ -395,7 +395,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // We can still check sessionStorage for displaying user info, but don't redirect.
     const userEmail = sessionStorage.getItem('userEmail');
     // const isAdmin = sessionStorage.getItem('isAdmin') === 'true'; // No longer needed for redirect
-
+    
     // Set up user email display
     const userEmailElement = document.getElementById('user-email');
     if (userEmailElement) {

@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dummy Shopping - Home</title>
   <link rel="stylesheet" href="styles.css">
+  <script src="https://js.stripe.com/v3/"></script>
   <style>
     /* Make button look like a link */
     button.link-button {
@@ -47,46 +48,20 @@
   </header>
 
   <!-- Hover-based cart that appears in both main and product pages -->
-  <form id="paypal-cart-form" action="https://www.sandbox.paypal.com/cgi-bin/webscr" method="post">
-    <section class="shopping-cart">
-      <div class="cart-summary">
-        <!-- Collapsed view showing total price -->
-        <p>Total: <span id="cart-total">$0.00</span></p>
-      </div>
-      <div class="cart-details">
-        <!-- Expanded view on hover, showing details of items -->
-        <h2>Shopping List</h2>
-        <ul id="cart-items">
-          <!-- Cart items will be dynamically added here -->
-        </ul>
-        <button type="button" id="checkout-btn" disabled>Checkout</button>
-      </div>
-    </section>
-
-    <!-- Static PayPal Fields -->
-    <input type="hidden" name="cmd" value="_cart">
-    <input type="hidden" name="upload" value="1">
-    <!-- Set to the correct PayPal Sandbox Business Email -->
-    <input type="hidden" name="business" value="sb-43rt9j39948135@business.example.com">
-    <input type="hidden" name="charset" value="utf-8">
-    <!-- Verify this is the correct currency -->
-    <input type="hidden" name="currency_code" value="HKD">
-
-    <!-- Dynamic Fields (Populated by JS after server validation) -->
-    <input type="hidden" name="invoice" id="paypal-invoice" value="">
-    <input type="hidden" name="custom" id="paypal-custom" value="">
-
-    <!-- Removed Static Placeholders for PayPal Items -->
-    <!-- 
-    <input type="hidden" name="item_name_1" id="paypal-item_name_1" value="">
-    <input type="hidden" name="item_number_1" id="paypal-item_number_1" value="">
-    <input type="hidden" name="quantity_1" id="paypal-quantity_1" value="">
-    <input type="hidden" name="amount_1" id="paypal-amount_1" value="">
-    -->
-
-    <!-- Container for dynamically added PayPal item fields REMOVED -->
-    <!-- <div id="paypal-items-container"></div> -->
-  </form>
+  <section class="shopping-cart">
+    <div class="cart-summary">
+      <!-- Collapsed view showing total price -->
+      <p>Total: <span id="cart-total">$0.00</span></p>
+    </div>
+    <div class="cart-details">
+      <!-- Expanded view on hover, showing details of items -->
+      <h2>Shopping List</h2>
+      <ul id="cart-items">
+        <!-- Cart items will be dynamically added here -->
+      </ul>
+      <button type="button" id="checkout-btn" disabled>Checkout</button>
+    </div>
+  </section>
 
   <main>
     <!-- Left column: Categories list -->
