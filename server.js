@@ -421,6 +421,15 @@ app.use(express.static('public'));  // Serve files from the public directory
 app.use('/uploads', express.static('uploads'));
 app.use('/js', express.static('public/js'));
 
+// <<< ADD EARLY LOGGING MIDDLEWARE HERE >>>
+app.use((req, res, next) => {
+    console.log(`[EARLY LOG] Request Received: ${req.method} ${req.originalUrl}`);
+    // Optionally log headers if needed for debugging proxies etc.
+    // console.log('[EARLY LOG] Headers:', req.headers);
+    next(); // Pass control to the next middleware/route
+});
+// <<< END EARLY LOGGING MIDDLEWARE >>>
+
 // =========================================================================
 // == SPECIAL ROUTES (Define BEFORE global body parsers if they have specific needs)
 // =========================================================================
@@ -640,7 +649,7 @@ app.use(cookieParser());
 // Skip CSRF for login, logout, and API routes
 app.use((req, res, next) => {
     // For login and logout endpoints, completely bypass protection
-    if (req.path === '/api/login' || req.path === '/api/logout') {
+    if (req.path === '/api/login' || req.path === '/api/logout' || req.path === '/api/register') {
         console.log('Completely bypassing protection for endpoint:', req.path);
         next();
         return;
@@ -668,7 +677,7 @@ app.use((req, res, next) => {
 // Apply CSRF validation for non-exempt routes
 app.use((req, res, next) => {
     // For login and logout endpoints, already skipped in previous middleware
-    if (req.path === '/api/login' || req.path === '/api/logout') {
+    if (req.path === '/api/login' || req.path === '/api/logout' || req.path === '/api/register') {
         next();
         return;
     }
