@@ -23,10 +23,10 @@
 
     /* Styles for Purchase History (Mirroring Shopping Cart) */
     .purchase-history {
-      position: fixed; /* Or absolute, depending on layout */
-      top: 110px; /* Adjust as needed */
-      right: 220px; /* Position LEFT of the cart (adjust width + margin) */
-      z-index: 1000;
+      position: fixed; /* Keep fixed like the shopping cart */
+      top: 20px; /* Align top with shopping cart */
+      right: 240px; /* Position LEFT of the cart (cart right + cart width + margin) */
+      z-index: 999; /* Lower z-index than cart details, but higher than others */
       width: 200px; /* Width of the summary box */
     }
     .history-summary {
@@ -36,6 +36,7 @@
       cursor: default; /* Indicate it's not clickable */
       text-align: center;
       border-radius: 5px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1); /* Match cart shadow */
     }
     .history-details {
       display: none; /* Initially hidden */
