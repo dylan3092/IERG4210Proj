@@ -582,6 +582,17 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// <<< ADD LOGGING AFTER BODY PARSERS >>>
+app.use((req, res, next) => {
+    // Log only for specific paths if needed to reduce noise, or log all
+    // if (req.path === '/api/register' || req.path === '/api/login') { 
+         console.log(`[BODY PARSER CHECK] Parsers finished for: ${req.method} ${req.originalUrl}`);
+         // console.log('[BODY PARSER CHECK] req.body:', req.body); // Uncomment to log parsed body
+    // }
+    next();
+});
+// <<< END LOGGING AFTER BODY PARSERS >>>
+
 // Security headers middleware
 app.use((req, res, next) => {
     // Prevent browsers from detecting MIME types incorrectly
