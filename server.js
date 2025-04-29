@@ -700,26 +700,33 @@ app.use((req, res, next) => {
 app.get('/api/csrf-token', csrfProtection.getTokenAPI);
 
 // Input sanitization middleware
-/*
+// <<< UNCOMMENT START >>>
 const sanitizeInput = (req, res, next) => {
     if (req.body) {
         Object.keys(req.body).forEach(key => {
+            // Only sanitize strings, leave other types (like numbers from JSON) alone
             if (typeof req.body[key] === 'string') {
+                // console.log(`Sanitizing body[${key}]: ${req.body[key]}`); // Optional: Log before sanitizing
                 req.body[key] = xss(req.body[key]);
+                // console.log(`Sanitized body[${key}]: ${req.body[key]}`); // Optional: Log after sanitizing
             }
         });
     }
     if (req.query) {
         Object.keys(req.query).forEach(key => {
             if (typeof req.query[key] === 'string') {
+                // console.log(`Sanitizing query[${key}]: ${req.query[key]}`);
                 req.query[key] = xss(req.query[key]);
+                // console.log(`Sanitized query[${key}]: ${req.query[key]}`);
             }
         });
     }
     if (req.params) {
         Object.keys(req.params).forEach(key => {
             if (typeof req.params[key] === 'string') {
+                // console.log(`Sanitizing params[${key}]: ${req.params[key]}`);
                 req.params[key] = xss(req.params[key]);
+                // console.log(`Sanitized params[${key}]: ${req.params[key]}`);
             }
         });
     }
@@ -728,7 +735,7 @@ const sanitizeInput = (req, res, next) => {
 
 // Apply sanitization middleware to all routes
 app.use(sanitizeInput);
-*/
+// <<< UNCOMMENT END >>>
 
 // Function to rotate session after successful login with enhanced security
 const rotateSession = (req, originalData) => {
