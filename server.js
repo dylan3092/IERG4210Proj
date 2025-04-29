@@ -700,6 +700,7 @@ app.use((req, res, next) => {
 app.get('/api/csrf-token', csrfProtection.getTokenAPI);
 
 // Input sanitization middleware
+/*
 const sanitizeInput = (req, res, next) => {
     if (req.body) {
         Object.keys(req.body).forEach(key => {
@@ -727,6 +728,7 @@ const sanitizeInput = (req, res, next) => {
 
 // Apply sanitization middleware to all routes
 app.use(sanitizeInput);
+*/
 
 // Function to rotate session after successful login with enhanced security
 const rotateSession = (req, originalData) => {
