@@ -18,6 +18,7 @@ const https = require('https'); // Also import https at the top
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY); // <<<<<< ADD STRIPE
 
 const app = express();
+app.disable('x-powered-by'); // <<< ADD THIS LINE
 
 // Trust the first hop from the reverse proxy (Apache)
 app.set('trust proxy', 1); 
@@ -601,7 +602,7 @@ app.use((req, res, next) => {
     // Prevent clickjacking
     res.setHeader('X-Frame-Options', 'DENY');
     
-    // XSS protection
+    // XSS protection (obsolete but often kept for older browsers)
     res.setHeader('X-XSS-Protection', '1; mode=block');
     
     // Referrer policy
@@ -609,6 +610,34 @@ app.use((req, res, next) => {
     
     // HTTP Strict Transport Security (force HTTPS)
     res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+
+    // --- ADD CSP LOGIC HERE ---
+    const nonce = generateSecureNonce(); // Generate nonce for this request
+    res.locals.cspNonce = nonce; // Make nonce available to templates if needed (though not currently used)
+
+    const cspDirectives = [
+        "default-src 'self'", // Default fallback - deny by default
+        // Allow scripts from self, your specific domains, and inline scripts with nonce
+        // Added 'unsafe-eval' for potential library use, review if possible to remove
+        `script-src 'self' https://js.stripe.com https://cdn.jsdelivr.net http://s15.ierg4210.ie.cuhk.edu.hk:3000 https://s15.ierg4210.ie.cuhk.edu.hk 'nonce-${nonce}' 'unsafe-eval'`, 
+        // Allow styles from self, CDNs, your domains, and inline styles (consider removing 'unsafe-inline' if possible)
+        "style-src 'self' https://cdn.jsdelivr.net http://s15.ierg4210.ie.cuhk.edu.hk:3000 https://s15.ierg4210.ie.cuhk.edu.hk 'unsafe-inline'",
+        // Allow images from self, data URIs, your domains
+        "img-src 'self' data: http://s15.ierg4210.ie.cuhk.edu.hk:3000 https://s15.ierg4210.ie.cuhk.edu.hk",
+        "form-action 'self'", // Forms can only submit to same origin
+        "frame-src 'self' https://js.stripe.com", // Allow Stripe frames
+        // Allow connections to self, Stripe API, your domains
+        "connect-src 'self' https://api.stripe.com http://s15.ierg4210.ie.cuhk.edu.hk:3000 https://s15.ierg4210.ie.cuhk.edu.hk",
+        // Allow fonts from self, CDNs, your domains
+        "font-src 'self' https://cdn.jsdelivr.net http://s15.ierg4210.ie.cuhk.edu.hk:3000 https://s15.ierg4210.ie.cuhk.edu.hk",
+        "media-src 'self'",
+        "object-src 'none'",
+        "base-uri 'self'",
+        // "upgrade-insecure-requests" // Often handled by HSTS and proxy, uncomment if needed
+    ];
+    // Apply the CSP header
+    res.setHeader('Content-Security-Policy', cspDirectives.join('; '));
+    // --- END CSP LOGIC --- 
     
     next();
 });
@@ -846,75 +875,6 @@ const generateSecureNonce = () => {
     // This provides enough entropy to make nonces unguessable
     return crypto.randomBytes(16).toString('base64');
 };
-
-// Add this near the top, after creating the app
-/*
-app.use((req, res, next) => {
-    // Set the specific origin instead of wildcard for credentials to work
-    const origin = req.headers.origin;
-    
-    // Allow requests from both the main site and with port 3000
-    if (origin) {
-        res.header('Access-Control-Allow-Origin', origin);
-        console.log(`Accepting request from origin: ${origin}`);
-    }
-    
-    // Allow credentials (cookies, authorization headers, etc)
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Allow-Methods', 'GET, PUT, POST, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, CSRF-Token, X-CSRF-Token');
-    
-    // Handle preflight requests
-    if (req.method === 'OPTIONS') {
-        console.log('Handling OPTIONS preflight request');
-        res.status(200).end();
-        return;
-    }
-    
-    // Generate a random nonce for this request
-    const nonce = generateSecureNonce();
-    
-    // Add Content Security Policy header
-    // This is a strict policy that helps prevent XSS attacks
-    const cspDirectives = [
-        // Default fallback - deny by default
-        "default-src 'self'",
-        // Scripts can be loaded from same origin and allow our external CDN
-        // Also allow inline scripts with the generated nonce and unsafe-inline as a fallback
-        `script-src 'self' http://s15.ierg4210.ie.cuhk.edu.hk:3000 http://s15.ierg4210.ie.cuhk.edu.hk 'nonce-${nonce}' 'unsafe-eval' 'unsafe-inline'`,
-        // Styles can be loaded from same origin and allow our external CDN and inline styles
-        "style-src 'self' https://cdn.jsdelivr.net http://s15.ierg4210.ie.cuhk.edu.hk:3000 http://s15.ierg4210.ie.cuhk.edu.hk 'unsafe-inline'",
-        // Images can be loaded from same origin and data URIs
-        "img-src 'self' data: http://s15.ierg4210.ie.cuhk.edu.hk:3000 http://s15.ierg4210.ie.cuhk.edu.hk",
-        // Forms can only submit to same origin
-        "form-action 'self'",
-        // Frames can only load from same origin
-        "frame-src 'self'",
-        // Connect to only same origin and our API server
-        "connect-src 'self' http://s15.ierg4210.ie.cuhk.edu.hk:3000 http://s15.ierg4210.ie.cuhk.edu.hk",
-        // Font sources
-        "font-src 'self' https://cdn.jsdelivr.net http://s15.ierg4210.ie.cuhk.edu.hk:3000 http://s15.ierg4210.ie.cuhk.edu.hk",
-        // Media sources
-        "media-src 'self'",
-        // Object sources (plugins, etc)
-        "object-src 'none'",
-        // Base URI restriction to prevent base tag hijacking
-        "base-uri 'self'",
-        // Upgrade insecure requests
-        "upgrade-insecure-requests"
-    ];
-    
-    // Set CSP header - use report-only first to test before enforcing
-    // Comment out for now as it may interfere with CORS
-    // res.header('Content-Security-Policy-Report-Only', cspDirectives.join('; '));
-    // res.header('Content-Security-Policy', cspDirectives.join('; '));
-    
-    // Make nonce available to templates if needed
-    res.locals.cspNonce = nonce;
-    
-    next();
-});
-*/
 
 // Test database connection on server start
 pool.getConnection()
