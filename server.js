@@ -828,6 +828,7 @@ const generateSecureNonce = () => {
 };
 
 // Add this near the top, after creating the app
+/*
 app.use((req, res, next) => {
     // Set the specific origin instead of wildcard for credentials to work
     const origin = req.headers.origin;
@@ -893,6 +894,7 @@ app.use((req, res, next) => {
     
     next();
 });
+*/
 
 // Test database connection on server start
 pool.getConnection()
