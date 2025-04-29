@@ -434,7 +434,7 @@ class CartUIController {
                 headers: {
                     'Content-Type': 'application/json',
                     // Add CSRF token if your endpoint requires it (check server.js configuration)
-                    // 'X-CSRF-Token': sessionStorage.getItem('csrfToken') 
+                    'X-CSRF-Token': sessionStorage.getItem('csrfToken')
                 },
                 body: JSON.stringify(cartData),
             });
