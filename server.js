@@ -439,12 +439,11 @@ app.post('/api/paypal-ipn', express.raw({ type: 'application/x-www-form-urlencod
         return;
     }
     
-    // Convert buffer to string for verification and manual parsing
-    const rawBodyString = rawBodyBuffer.toString('utf8');
-    console.log('[IPN] Raw body string:', rawBodyString);
+    // Convert buffer to string, trimming whitespace, explicitly using utf8
+    const rawBodyString = rawBodyBuffer.toString('utf8').trim();
+    console.log('[IPN] Raw body string (trimmed):', rawBodyString);
 
     // Manually parse the necessary fields from the raw string for later use
-    // (Using URLSearchParams is a safe way to handle urlencoded data)
     const parsedParams = new URLSearchParams(rawBodyString);
     const parsedBodyCopy = {};
     parsedParams.forEach((value, key) => { parsedBodyCopy[key] = value; });
@@ -453,33 +452,38 @@ app.post('/api/paypal-ipn', express.raw({ type: 'application/x-www-form-urlencod
     // Use IIFE for async verification
     (async () => {
         try {
-            // 1. Construct verification request body - REVERTING to simple string concatenation
-            const originalParams = new URLSearchParams(rawBodyString); // Keep parsing for later use
-            let verificationBody = `cmd=_notify-verify&${rawBodyString}`; // Revert to this
+            // 1. Construct verification request body using simple concatenation
+            let verificationBody = `cmd=_notify-verify&${rawBodyString}`;
             
-            // Log the exact body being sent for verification
+            // Calculate Content-Length accurately using bytes
+            const bodyByteLength = Buffer.byteLength(verificationBody, 'utf8');
+
             console.log('[IPN] Sending verification POST body:', verificationBody);
+            console.log(`[IPN] Calculated verification body byte length: ${bodyByteLength}`);
 
             // 2. Send verification request back to PayPal Sandbox
             const options = {
-                hostname: 'www.sandbox.paypal.com',  // Try main sandbox endpoint
+                hostname: 'www.sandbox.paypal.com', 
                 port: 443,
                 path: '/cgi-bin/webscr',
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8', // Explicitly add charset
-                    'Content-Length': verificationBody.length,
+                    'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8', 
+                    'Content-Length': bodyByteLength, // Use accurate byte length
                     'Connection': 'close',
-                    'Host': 'www.sandbox.paypal.com', // Host should match hostname
-                    'User-Agent': 'NodeJS-IPN-Verification',
+                    'Host': 'www.sandbox.paypal.com', 
+                    'User-Agent': 'NodeJS-IPN-Verification/1.1', // Slightly updated UA
                     'Accept': '*/*'
                 }
             };
+            
+            // Log the options being used
+            console.log('[IPN] HTTPS Request Options:', JSON.stringify(options, null, 2));
 
-            console.log('[IPN] Sending verification request body (length):', verificationBody.length);
             const paypalRes = await new Promise((resolve, reject) => {
                 const verificationReq = https.request(options, (paypalRes) => {
                     let data = '';
+                    paypalRes.setEncoding('utf8'); // Ensure response is also treated as UTF-8
                     paypalRes.on('data', (chunk) => { data += chunk; });
                     paypalRes.on('end', () => resolve(data));
                 });
