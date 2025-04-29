@@ -1948,3 +1948,102 @@ const server = app.listen(httpPort, () => {
 // Notify that we're relying on Apache for SSL
 console.log('Running in HTTP mode only. SSL/HTTPS is managed by Apache.');
 console.log('The server is listening on port 3000 for proxied connections.'); 
+
+// =========================================================================
+// == REGISTRATION API
+// =========================================================================
+app.post('/api/register', async (req, res) => {
+    try {
+        const { email, password } = req.body;
+        console.log('[API /api/register] Registration attempt received for email:', email);
+
+        // --- Basic Server-Side Validation ---
+        if (!email || !password) {
+            return res.status(400).json({ error: 'Email and password are required.' });
+        }
+        // Regex for basic email validation (adjust as needed)
+        if (!/^\S+@\S+\.\S+$/.test(email)) { 
+             return res.status(400).json({ error: 'Invalid email format.' });
+        }
+        if (password.length < 8) {
+             return res.status(400).json({ error: 'Password must be at least 8 characters long.' });
+        }
+        // --- End Validation ---
+        
+        let connection;
+        try {
+            connection = await pool.getConnection();
+            console.log('[API /api/register] DB connection obtained.');
+
+            // Check if email already exists
+            const [existingUsers] = await connection.query('SELECT userid FROM users WHERE email = ?', [email]);
+            if (existingUsers.length > 0) {
+                console.warn('[API /api/register] Registration failed: Email already exists -', email);
+                return res.status(409).json({ error: 'Email address already registered.' }); // 409 Conflict
+            }
+            
+            console.log('[API /api/register] Email is unique. Proceeding with hashing password...');
+            // Hash the password
+            const hashedPassword = await authUtils.hashPassword(password);
+            console.log('[API /api/register] Password hashed.');
+
+            // Insert the new user (default is_admin is FALSE)
+            const [insertResult] = await connection.query(
+                'INSERT INTO users (email, password, is_admin) VALUES (?, ?, FALSE)',
+                [email, hashedPassword]
+            );
+            const newUserId = insertResult.insertId;
+            console.log(`[API /api/register] New user inserted with ID: ${newUserId}`);
+
+            // --- Automatically Log In User ---
+            // Prepare session data for the new user
+            const sessionData = {
+                userId: newUserId,
+                userEmail: email,
+                is_admin: false, // New users are not admins
+                isAuthenticated: true
+            };
+
+            // Rotate session to establish login state
+            await rotateSession(req, sessionData); 
+            console.log(`[API /api/register] Session rotated for new user ID: ${newUserId}`);
+
+            // Explicitly save the session before sending the response
+            req.session.save((saveErr) => {
+                if (saveErr) {
+                    console.error('[API /api/register] Error saving session after registration rotation:', saveErr);
+                    // Proceed with success response but log the error
+                    // The client might need to log in manually if session save failed badly
+                    return res.status(201).json({ 
+                        success: true, 
+                        user: { email: email, isAdmin: false },
+                        warning: 'Registration successful, but session might not be fully saved.'
+                    }); 
+                }
+                
+                console.log('[API /api/register] Session saved after rotation. Sending success response.');
+                // Return success response AFTER session is saved
+                return res.status(201).json({ // 201 Created status
+                    success: true,
+                    user: {
+                        email: email,
+                        isAdmin: false
+                    }
+                });
+            });
+            // --- End Auto Login ---
+
+        } catch (dbError) {
+             console.error('[API /api/register] Database error during registration:', dbError);
+             return res.status(500).json({ error: 'Database error during registration.' });
+        } finally {
+             if (connection) {
+                 console.log('[API /api/register] Releasing DB connection');
+                 connection.release();
+             }
+        }
+    } catch (error) {
+        console.error('[API /api/register] General error:', error);
+        return res.status(500).json({ error: 'Internal server error during registration.' });
+    }
+});

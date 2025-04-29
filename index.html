@@ -108,6 +108,7 @@
       <div class="user-info">
         Welcome, <span id="user-display">Guest</span>
         <div class="user-actions">
+          <button onclick="window.location.href='register.html'" id="register-link" class="link-button">Register</button>
           <button onclick="window.location.href='login.html'" id="login-link" class="link-button">Login</button>
           <a href="#" id="logout-link" style="display: none;">Logout</a>
           <a href="/admin" id="admin-link" style="display: none;">Admin Panel</a>
@@ -178,6 +179,7 @@
       const isAdmin = sessionStorage.getItem('isAdmin');
       const userDisplay = document.getElementById('user-display');
       const loginLink = document.getElementById('login-link');
+      const registerLink = document.getElementById('register-link');
       const logoutLink = document.getElementById('logout-link');
       const adminLink = document.getElementById('admin-link');
       
@@ -185,6 +187,7 @@
         // User is logged in
         userDisplay.textContent = userEmail;
         loginLink.style.display = 'none';
+        registerLink.style.display = 'none';
         logoutLink.style.display = 'inline';
         
         // Show admin link if user is admin
@@ -242,6 +245,10 @@
         } catch (error) {
             console.error('Error fetching CSRF token:', error);
         }
+      } else {
+        // User is logged out - ensure register button is shown (it's visible by default)
+        logoutLink.style.display = 'none';
+        adminLink.style.display = 'none';
       }
     });
 
