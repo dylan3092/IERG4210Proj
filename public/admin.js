@@ -339,100 +339,163 @@ const setupUserActions = () => {
     }
 };
 
-// First, fetch the CSRF token, then load initial data
-(async () => {
-    console.log('[Admin IIFE] Initializing...');
+// ======================================================
+// == Orders Management
+// ======================================================
+const loadOrders = async () => {
+    const ordersTableBody = document.getElementById('orders-table-body');
+    if (!ordersTableBody) {
+        console.error('Orders table body element not found!');
+        return;
+    }
+
+    ordersTableBody.innerHTML = '<tr><td colspan="8" class="text-center">Loading orders...</td></tr>'; // Show loading state
+
     try {
-        // Remove the premature auth check and redirect based on API call
-        // The server-side middleware should handle unauthorized access.
-        // We still fetch CSRF token first.
+        console.log('Fetching orders from /api/admin/orders');
+        const response = await fetch('/api/admin/orders'); // Use relative path or construct from BASE_URL if needed
+        console.log('Orders response status:', response.status);
+
+        if (!response.ok) {
+             let errorMsg = `Failed to load orders: ${response.status} ${response.statusText}`;
+             try {
+                 const errorData = await response.json();
+                 errorMsg = errorData.error || errorMsg;
+             } catch (e) { /* Ignore if response is not JSON */ }
+             console.error('Error loading orders:', errorMsg);
+             throw new Error(errorMsg);
+        }
+
+        const orders = await response.json();
+        console.log('Orders loaded:', orders);
+
+        ordersTableBody.innerHTML = ''; // Clear loading/existing rows
+
+        if (orders.length === 0) {
+            ordersTableBody.innerHTML = '<tr><td colspan="8" class="text-center">No orders found.</td></tr>';
+        } else {
+            orders.forEach(order => {
+                const row = document.createElement('tr');
+                
+                // Format date nicely
+                const orderDate = new Date(order.order_date).toLocaleString();
+
+                // Create item summary (e.g., "Item1 (x2), Item2 (x1)")
+                let itemSummary = order.items.map(item => 
+                    `${item.product_name || 'Unknown'} (x${item.quantity})`
+                ).join(', ');
+                if (itemSummary.length > 50) { // Truncate if too long
+                    itemSummary = itemSummary.substring(0, 47) + '...';
+                }
+                if (!itemSummary) {
+                    itemSummary = 'No items recorded';
+                }
+                
+                // Optional: Shorten Stripe Session ID for display
+                const shortSessionId = order.stripe_session_id 
+                    ? order.stripe_session_id.substring(0, 15) + '...' 
+                    : 'N/A';
+
+                row.innerHTML = `
+                    <td>${order.order_id}</td>
+                    <td>${order.user_email || 'Guest'}</td>
+                    <td>${orderDate}</td>
+                    <td>${order.total_amount}</td>
+                    <td>${order.currency}</td>
+                    <td><span class="badge bg-${getStatusColor(order.status)}">${order.status}</span></td>
+                    <td title="${order.stripe_session_id || ''}">${shortSessionId}</td>
+                    <td title="${order.items.map(i => `${i.product_name}(${i.quantity}) @ ${i.price_at_purchase}`).join('\n')}">${itemSummary}</td>
+                `;
+                ordersTableBody.appendChild(row);
+            });
+        }
+    } catch (error) {
+        console.error('Error in loadOrders:', error);
+        ordersTableBody.innerHTML = `<tr><td colspan="8" class="text-center text-danger">Error loading orders: ${error.message}</td></tr>`;
+        showMessage(error.message, true);
+    }
+};
+
+// Helper function for status badge color
+const getStatusColor = (status) => {
+    switch (status?.toUpperCase()) {
+        case 'COMPLETED': return 'success';
+        case 'PENDING': return 'warning';
+        case 'FAILED':
+        case 'AMOUNT_MISMATCH':
+        case 'CURRENCY_MISMATCH':
+        case 'INVALID_DIGEST': // Keep old paypal status color
+             return 'danger';
+        default: return 'secondary';
+    }
+};
+
+// Initialization
+document.addEventListener('DOMContentLoaded', async () => {
+    console.log('Admin Panel DOM Loaded');
+    
+    // Basic auth check (redirect if not admin)
+    // This relies on server-side protection for actual security
+    const isAdmin = sessionStorage.getItem('isAdmin');
+    const userEmail = sessionStorage.getItem('userEmail');
+
+    const authLoader = document.getElementById('auth-loader');
+    
+    // Fetch auth status from server for robust check
+    try {
+        const authResponse = await fetch('/api/auth/status', { credentials: 'include' });
+        const authData = await authResponse.json();
+        
+        if (!authResponse.ok || !authData.authenticated || !authData.user?.isAdmin) {
+            console.warn('Authentication failed or user is not admin. Redirecting to login.');
+            window.location.href = '/login.html?error=admin_required';
+            return; // Stop further execution
+        }
+        
+        // Auth successful, show page content
+        document.body.style.visibility = 'visible';
+        if(authLoader) authLoader.style.display = 'none'; // Hide loader
+        console.log('Admin Authentication successful for:', authData.user.email);
+        document.getElementById('user-email').textContent = authData.user.email;
+        
+        // Now fetch CSRF token since user is authenticated
         await fetchCsrfToken();
         
-        // Inject CSRF tokens into the forms
-        const categoryPlaceholder = document.getElementById('csrf-category-placeholder');
-        const productPlaceholder = document.getElementById('csrf-product-placeholder');
-        
-        if (categoryPlaceholder) {
-            categoryPlaceholder.innerHTML = `<input type="hidden" name="_csrf" value="${csrfToken}">`;
+        // Inject CSRF token into forms
+        const csrfCategoryPlaceholder = document.getElementById('csrf-category-placeholder');
+        const csrfProductPlaceholder = document.getElementById('csrf-product-placeholder');
+        if (csrfCategoryPlaceholder) {
+            csrfCategoryPlaceholder.innerHTML = `<input type="hidden" name="_csrf" value="${csrfToken}">`;
         }
-        
-        if (productPlaceholder) {
-            productPlaceholder.innerHTML = `<input type="hidden" name="_csrf" value="${csrfToken}">`;
+        if (csrfProductPlaceholder) {
+            csrfProductPlaceholder.innerHTML = `<input type="hidden" name="_csrf" value="${csrfToken}">`;
         }
-        
-        // Store the CSRF token in session storage for use in other requests
-        sessionStorage.setItem('csrfToken', csrfToken);
-        
-        // Update user email display if available
-        if (sessionStorage.getItem('userEmail')) {
-            const userEmailElement = document.getElementById('user-email');
-            if (userEmailElement) {
-                userEmailElement.textContent = sessionStorage.getItem('userEmail');
-            }
-        }
-        
-        // Setup user action event listeners
-        setupUserActions();
-        
-        // Load data after CSRF setup is complete
-        // Let's move data loading to DOMContentLoaded to ensure elements exist
-        // loadCategories(); 
-        // loadProducts();
-    } catch (error) {
-        console.error('Error initializing admin panel (IIFE):', error);
-        // Don't redirect here, let server handle auth
-        // window.location.href = '/login.html'; 
-        showMessage('Initialization error. Check console.', true);
-    }
-})();
 
-// Initialize everything when the page loads
-document.addEventListener('DOMContentLoaded', async () => {
-    console.log('[Admin DOMContentLoaded] Initializing...');
-    
-    // We rely on the server-side middleware to block unauthorized access.
-    // If this script runs, the user *should* be an authorized admin.
-    // We can still check sessionStorage for displaying user info, but don't redirect.
-    const userEmail = sessionStorage.getItem('userEmail');
-    // const isAdmin = sessionStorage.getItem('isAdmin') === 'true'; // No longer needed for redirect
-    
-    // Set up user email display
-    const userEmailElement = document.getElementById('user-email');
-    if (userEmailElement) {
-        userEmailElement.textContent = userEmail;
-    }
-    
-    // Set up logout button
-    const logoutButton = document.getElementById('logout-button');
-    if (logoutButton) {
-        logoutButton.addEventListener('click', handleLogout);
-    }
-    
-    // Load categories and products
-    try {
-        await loadCategories();
-        await loadProducts();
     } catch (error) {
-        console.error('Error loading data:', error);
-        showMessage('Error loading data. Please check the console for details.', true);
+        console.error('Error checking auth status:', error);
+        if(authLoader) authLoader.innerHTML = '<p class="text-danger">Error validating authentication. Please try logging in again.</p>';
+        // Optionally redirect after a delay
+        // setTimeout(() => window.location.href = '/login.html?error=auth_check_failed', 3000);
+        return; // Stop if auth check fails
     }
-    
-    // Set up form submit handlers
+
+    // Attach form handlers
     const categoryForm = document.getElementById('category-form');
-    if (categoryForm) {
-        categoryForm.addEventListener('submit', handleCategorySubmit);
-    }
-    
     const productForm = document.getElementById('product-form');
-    if (productForm) {
-        productForm.addEventListener('submit', handleProductSubmit);
-    }
+    
+    if (categoryForm) categoryForm.addEventListener('submit', handleCategorySubmit);
+    if (productForm) productForm.addEventListener('submit', handleProductSubmit);
 
-    // Finally, hide loader and show body
-    const loader = document.getElementById('auth-loader');
-    if (loader) {
-        loader.style.display = 'none'; // Hide the loader
+    // Setup user actions (logout, change password)
+    setupUserActions();
+    
+    // Load initial data
+    try {
+        await loadCategories(); // Load categories first for product form dropdown
+        await loadProducts();
+        await loadOrders(); // <<< CALL loadOrders HERE
+    } catch (error) {
+        console.error("Error loading initial admin data:", error);
+        showMessage("Failed to load some admin data. Please check console.", true);
     }
-    document.body.style.visibility = 'visible'; // Show the main content
-    console.log('[Admin DOMContentLoaded] Initialization complete. Body visible.');
 }); 

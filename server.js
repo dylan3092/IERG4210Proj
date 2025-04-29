@@ -1574,6 +1574,76 @@ app.get('/api/auth/status', (req, res) => {
 });
 
 // =========================================================================
+// == ADMIN-ONLY ORDER VIEW API
+// =========================================================================
+app.get('/api/admin/orders', authUtils.authorizeAdmin, async (req, res) => {
+    console.log('[API /api/admin/orders] Request received');
+    let connection;
+    try {
+        connection = await pool.getConnection();
+        console.log('[API /api/admin/orders] DB connection obtained');
+
+        // Query to get all orders along with their items and product names
+        // Order by most recent first
+        const sql = `
+            SELECT 
+                o.order_id, o.user_email, o.total_amount, o.currency, o.status, 
+                o.stripe_session_id, o.created_at AS order_date,
+                oi.product_id, oi.quantity, oi.price_at_purchase,
+                p.name AS product_name
+            FROM orders o
+            LEFT JOIN order_items oi ON o.order_id = oi.order_id
+            LEFT JOIN products p ON oi.product_id = p.pid
+            ORDER BY o.created_at DESC, o.order_id DESC, oi.product_id ASC;
+        `;
+        console.log('[API /api/admin/orders] Executing SQL query');
+        const [rows] = await connection.query(sql);
+        console.log(`[API /api/admin/orders] Query returned ${rows.length} rows`);
+
+        // Process rows into a structured format: group items by order_id
+        const ordersMap = new Map();
+        rows.forEach(row => {
+            if (!ordersMap.has(row.order_id)) {
+                ordersMap.set(row.order_id, {
+                    order_id: row.order_id,
+                    user_email: row.user_email,
+                    total_amount: parseFloat(row.total_amount).toFixed(2),
+                    currency: row.currency,
+                    status: row.status,
+                    stripe_session_id: row.stripe_session_id,
+                    order_date: row.order_date,
+                    items: []
+                });
+            }
+            // Add item details if they exist (LEFT JOIN might produce nulls for orders with no items)
+            if (row.product_id) {
+                ordersMap.get(row.order_id).items.push({
+                    product_id: row.product_id,
+                    product_name: row.product_name || 'N/A',
+                    quantity: row.quantity,
+                    price_at_purchase: parseFloat(row.price_at_purchase).toFixed(2)
+                });
+            }
+        });
+
+        // Convert map values to an array
+        const orders = Array.from(ordersMap.values());
+        console.log(`[API /api/admin/orders] Processed into ${orders.length} distinct orders`);
+
+        res.json(orders);
+
+    } catch (error) {
+        console.error('[API /api/admin/orders] Error fetching orders:', error);
+        res.status(500).json({ error: 'Failed to fetch orders.' });
+    } finally {
+        if (connection) {
+            console.log('[API /api/admin/orders] Releasing DB connection');
+            connection.release();
+        }
+    }
+});
+
+// =========================================================================
 // == ORDER CREATION API (/api/create-checkout-session) - REPLACES /api/create-order
 // =========================================================================
 // Rename endpoint for clarity

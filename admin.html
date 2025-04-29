@@ -59,6 +59,7 @@
             <div class="user-section">
                 <span class="user-email" id="user-email"></span>
                 <div class="btn-group">
+                    <button id="go-to-shop-button" class="btn btn-info btn-sm">Go to Shop</button>
                     <button id="change-password-button" class="btn btn-warning btn-sm">Change Password</button>
                     <button id="logout-button" class="btn btn-danger btn-sm">Logout</button>
                 </div>
@@ -143,6 +144,41 @@
                 </div>
             </div>
         </div>
+
+        <!-- ADD ORDERS SECTION -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-secondary text-white">
+                        <h2>Manage Orders</h2>
+                    </div>
+                    <div class="card-body">
+                        <div id="orders-list" class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Order ID</th>
+                                        <th>User Email</th>
+                                        <th>Order Date</th>
+                                        <th>Total Amount</th>
+                                        <th>Currency</th>
+                                        <th>Status</th>
+                                        <th>Stripe Session</th>
+                                        <th>Items</th> 
+                                    </tr>
+                                </thead>
+                                <tbody id="orders-table-body">
+                                    <!-- Orders will be loaded here -->
+                                    <tr><td colspan="8" class="text-center">Loading orders...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- END ORDERS SECTION -->
+
     </div>
     
     <!-- Password Change Modal -->
@@ -287,6 +323,14 @@
             });
         }
     });
+
+    // Add click handler for the new button
+    const shopButton = document.getElementById('go-to-shop-button');
+    if(shopButton) {
+        shopButton.addEventListener('click', () => {
+            window.location.href = '/'; // Navigate to home page
+        });
+    }
     </script>
 </body>
 </html> 
