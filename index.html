@@ -20,6 +20,74 @@
     button.link-button:hover {
       color: darkblue;
     }
+
+    /* Styles for Purchase History (Mirroring Shopping Cart) */
+    .purchase-history {
+      position: fixed; /* Or absolute, depending on layout */
+      top: 110px; /* Adjust as needed */
+      right: 220px; /* Position LEFT of the cart (adjust width + margin) */
+      z-index: 1000;
+      width: 200px; /* Width of the summary box */
+    }
+    .history-summary {
+      background-color: #f0f0f0;
+      border: 1px solid #ccc;
+      padding: 10px;
+      cursor: default; /* Indicate it's not clickable */
+      text-align: center;
+      border-radius: 5px;
+    }
+    .history-details {
+      display: none; /* Initially hidden */
+      opacity: 0;
+      position: absolute;
+      top: 100%; /* Position below the summary */
+      right: 0;
+      width: 350px; /* Wider for details */
+      max-height: 400px; /* Limit height */
+      overflow-y: auto; /* Add scroll if needed */
+      background-color: white;
+      border: 1px solid #ccc;
+      padding: 15px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      border-radius: 5px;
+      transition: opacity 0.3s ease-in-out;
+      z-index: 1001;
+    }
+     .history-details h2 {
+        margin-top: 0;
+        margin-bottom: 15px;
+        font-size: 1.2em;
+     }
+     .history-details ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+     }
+     .history-details li {
+        border-bottom: 1px dashed #eee;
+        padding: 10px 0;
+        font-size: 0.9em;
+     }
+     .history-details li:last-child {
+        border-bottom: none;
+     }
+     .history-details .order-id {
+        font-weight: bold;
+     }
+     .history-details .order-date {
+        font-size: 0.8em; color: #666;
+        display: block;
+     }
+     .history-details .order-total {
+        font-weight: bold; float: right;
+     }
+     .history-details .order-status {
+         display: inline-block; padding: 2px 5px; border-radius: 3px; color: white; font-size: 0.8em; margin-left: 5px;
+     }
+     .history-details .order-items {
+         font-size: 0.85em; color: #555; margin-top: 5px; display: block; clear: both;
+     }
   </style>
 </head>
 <body>
@@ -47,7 +115,21 @@
     </div>
   </header>
 
-  <!-- Hover-based cart that appears in both main and product pages -->
+  <!-- ADD PURCHASE HISTORY SECTION (Initially hidden if user is guest) -->
+  <section class="purchase-history" id="purchase-history-section" style="display: none;"> 
+      <div class="history-summary">
+          <p>Purchase History</p>
+      </div>
+      <div class="history-details">
+          <h2>Recent Orders</h2>
+          <ul id="history-items">
+              <!-- History items will be dynamically added here -->
+              <li>Loading history...</li>
+          </ul>
+      </div>
+  </section>
+
+  <!-- Shopping Cart Section -->
   <section class="shopping-cart">
     <div class="cart-summary">
       <!-- Collapsed view showing total price -->
@@ -140,6 +222,10 @@
           }
         });
 
+        // Show and initialize Purchase History section
+        initializePurchaseHistory();
+        await loadPurchaseHistory();
+
         // Fetch and store CSRF token for authenticated users
         try {
             console.log('Fetching CSRF token for main page...');
@@ -156,6 +242,100 @@
         }
       }
     });
+
+    // Function to initialize hover effect for purchase history
+    function initializePurchaseHistory() {
+        const historySection = document.getElementById('purchase-history-section');
+        const historyDetails = historySection?.querySelector('.history-details');
+
+        if (historySection && historyDetails) {
+            historySection.style.display = 'block'; // Show the section for logged-in users
+
+            historySection.addEventListener('mouseenter', () => {
+                historyDetails.style.opacity = '1';
+                historyDetails.style.display = 'block';
+            });
+
+            historySection.addEventListener('mouseleave', () => {
+                historyDetails.style.opacity = '0';
+                // Use setTimeout to allow fade-out transition before hiding
+                setTimeout(() => {
+                    if (historySection.matches(':hover') === false) { // Double check if mouse *really* left
+                         historyDetails.style.display = 'none';
+                    }
+                }, 300); 
+            });
+        } else {
+            console.error("Purchase history elements not found for initialization.");
+        }
+    }
+
+    // Function to load purchase history data
+    async function loadPurchaseHistory() {
+        const historyList = document.getElementById('history-items');
+        if (!historyList) return;
+
+        historyList.innerHTML = '<li>Loading history...</li>';
+
+        try {
+            const response = await fetch('/api/user/orders', { credentials: 'include' }); // Use relative path
+            if (!response.ok) {
+                let errorMsg = `Error ${response.status}: ${response.statusText}`;
+                if (response.status === 401) {
+                    errorMsg = 'Please log in to view history.';
+                } else {
+                    try {
+                         const errData = await response.json();
+                         errorMsg = errData.error || errorMsg;
+                    } catch(e) { /* ignore */ }
+                }
+                throw new Error(errorMsg);
+            }
+
+            const orders = await response.json();
+
+            if (orders.length === 0) {
+                historyList.innerHTML = '<li>No purchase history found.</li>';
+            } else {
+                historyList.innerHTML = ''; // Clear loading message
+                orders.forEach(order => {
+                    const li = document.createElement('li');
+                    const orderDate = new Date(order.order_date).toLocaleString();
+                    const itemSummary = order.items.map(item => 
+                        `${item.product_name || 'Unknown'} (x${item.quantity})`
+                    ).join(', ') || 'No items';
+                     const statusColor = getStatusColor(order.status); // Reuse status color logic
+
+                    li.innerHTML = `
+                        <span class="order-id">Order #${order.order_id}</span>
+                        <span class="order-total">${order.currency} ${order.total_amount}</span>
+                        <span class="order-date">${orderDate}</span>
+                        <span class="order-status" style="background-color: ${statusColor};">${order.status}</span>
+                        <span class="order-items">Items: ${itemSummary}</span>
+                    `;
+                    historyList.appendChild(li);
+                });
+            }
+
+        } catch (error) {
+            console.error('Failed to load purchase history:', error);
+            historyList.innerHTML = `<li>Error: ${error.message}</li>`;
+        }
+    }
+
+    // Helper function for status badge color (can be shared)
+    function getStatusColor(status) {
+        switch (status?.toUpperCase()) {
+            case 'COMPLETED': return 'green';
+            case 'PENDING': return 'orange';
+            case 'FAILED':
+            case 'AMOUNT_MISMATCH':
+            case 'CURRENCY_MISMATCH':
+            case 'INVALID_DIGEST': 
+                 return 'red';
+            default: return 'grey';
+        }
+    }
   </script>
   <!-- Script path detector -->
   <script>

@@ -287,11 +287,14 @@ document.getElementById('product-form').addEventListener('submit', handleProduct
 // Handle user logout
 const handleLogout = async () => {
     try {
-        const response = await safeFetch(`${BASE_URL}/api/logout`, {
+        // Use relative path for logout to avoid double /api
+        const response = await fetch('/api/logout', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
-            }
+                // No CSRF needed for logout based on server.js logic
+            },
+            credentials: 'include' // Send session cookies
         });
 
         if (response.ok) {

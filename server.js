@@ -1644,6 +1644,88 @@ app.get('/api/admin/orders', authUtils.authorizeAdmin, async (req, res) => {
 });
 
 // =========================================================================
+// == USER ORDER HISTORY API
+// =========================================================================
+app.get('/api/user/orders', authUtils.authenticate, async (req, res) => {
+    const userId = req.session.userId; // Get user ID from session
+    console.log(`[API /api/user/orders] Request received for user ID: ${userId}`);
+    
+    if (!userId) {
+        // This shouldn't happen if authUtils.authenticate works, but check anyway
+        return res.status(401).json({ error: 'User not properly authenticated.' });
+    }
+
+    let connection;
+    try {
+        connection = await pool.getConnection();
+        console.log('[API /api/user/orders] DB connection obtained');
+
+        // Query to get the last 5 orders for the specific user, along with items
+        const sql = `
+            SELECT 
+                o.order_id, o.user_email, o.total_amount, o.currency, o.status, 
+                o.stripe_session_id, o.created_at AS order_date,
+                oi.product_id, oi.quantity, oi.price_at_purchase,
+                p.name AS product_name
+            FROM (
+                -- Select the 5 most recent order IDs for the user
+                SELECT order_id
+                FROM orders
+                WHERE user_id = ?
+                ORDER BY created_at DESC
+                LIMIT 5
+            ) AS recent_orders
+            JOIN orders o ON recent_orders.order_id = o.order_id
+            LEFT JOIN order_items oi ON o.order_id = oi.order_id
+            LEFT JOIN products p ON oi.product_id = p.pid
+            ORDER BY o.created_at DESC, o.order_id DESC, oi.product_id ASC;
+        `;
+        console.log('[API /api/user/orders] Executing SQL query');
+        const [rows] = await connection.query(sql, [userId]);
+        console.log(`[API /api/user/orders] Query returned ${rows.length} rows for user ${userId}`);
+
+        // Process rows into structured format (same logic as admin orders)
+        const ordersMap = new Map();
+        rows.forEach(row => {
+            if (!ordersMap.has(row.order_id)) {
+                ordersMap.set(row.order_id, {
+                    order_id: row.order_id,
+                    user_email: row.user_email,
+                    total_amount: parseFloat(row.total_amount).toFixed(2),
+                    currency: row.currency,
+                    status: row.status,
+                    stripe_session_id: row.stripe_session_id,
+                    order_date: row.order_date,
+                    items: []
+                });
+            }
+            if (row.product_id) {
+                ordersMap.get(row.order_id).items.push({
+                    product_id: row.product_id,
+                    product_name: row.product_name || 'N/A',
+                    quantity: row.quantity,
+                    price_at_purchase: parseFloat(row.price_at_purchase).toFixed(2)
+                });
+            }
+        });
+
+        const orders = Array.from(ordersMap.values());
+        console.log(`[API /api/user/orders] Processed into ${orders.length} distinct orders for user ${userId}`);
+
+        res.json(orders);
+
+    } catch (error) {
+        console.error(`[API /api/user/orders] Error fetching orders for user ${userId}:`, error);
+        res.status(500).json({ error: 'Failed to fetch order history.' });
+    } finally {
+        if (connection) {
+            console.log('[API /api/user/orders] Releasing DB connection');
+            connection.release();
+        }
+    }
+});
+
+// =========================================================================
 // == ORDER CREATION API (/api/create-checkout-session) - REPLACES /api/create-order
 // =========================================================================
 // Rename endpoint for clarity
