@@ -649,27 +649,21 @@ app.use(cookieParser());
 // Skip CSRF for login, logout, and API routes
 app.use((req, res, next) => {
     // For login and logout endpoints, completely bypass protection
-    if (req.path === '/api/login' || req.path === '/api/logout' || req.path === '/api/register') {
+    if (req.path === '/api/login' || req.path === '/api/logout') { 
         console.log('Completely bypassing protection for endpoint:', req.path);
         next();
         return;
     }
     
-    // Skip CSRF for API endpoints that need to be accessed cross-origin
+    // Skip CSRF injection/validation for API endpoints that need to be accessed cross-origin
     if (req.path === '/api/categories' || req.path === '/api/products' || 
         req.path.startsWith('/api/products/')) {
-        console.log('Skipping CSRF for:', req.path);
+        console.log('Skipping CSRF injection/validation for:', req.path);
         next();
     } else {
-        // For all other routes, apply CSRF protection
+        // For all other routes, apply CSRF protection (injection and origin validation)
         csrfProtection.injectToken(req, res, () => {
-            // Skip origin validation for API endpoints
-            if (req.path === '/api/categories' || req.path === '/api/products' || 
-                req.path.startsWith('/api/products/')) {
-                next();
-            } else {
-                validateOrigin(req, res, next);
-            }
+            validateOrigin(req, res, next);
         });
     }
 });
