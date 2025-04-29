@@ -211,8 +211,9 @@
               sessionStorage.removeItem('isAdmin');
               sessionStorage.removeItem('csrfToken');
               
-              // Refresh the page
-              window.location.reload();
+              // Refresh the page - CHANGE THIS to redirect to home
+              // window.location.reload(); 
+              window.location.href = '/'; // Redirect to home page for clean state
             } else {
               console.error('Logout failed:', await response.text());
               alert('Failed to logout. Please try again.');
