@@ -2040,6 +2040,7 @@ console.log('The server is listening on port 3000 for proxied connections.');
 // <<< MOVE styles.css ROUTE HERE >>>
 // Explicitly serve styles.css from the project root
 app.get('/styles.css', (req, res) => {
+    console.log('[ROUTE HIT] Request received for /styles.css'); // <<< ADD THIS LOG
     res.sendFile(path.join(__dirname, 'styles.css'), { 
         headers: { 'Content-Type': 'text/css' } 
     }, (err) => {
