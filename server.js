@@ -417,10 +417,8 @@ const validateOrigin = (req, res, next) => {
 };
 
 // Middleware
-//app.use(express.static(__dirname)); // Serve files from the root directory
 app.use(express.static(path.join(__dirname, 'public')));  // Serve files from the public directory
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-// app.use('/js', express.static(path.join(__dirname, 'public/js'))); // REMOVE THIS LINE
 
 // <<< ADD EARLY LOGGING MIDDLEWARE HERE >>>
 app.use((req, res, next) => {
@@ -2036,21 +2034,6 @@ const server = app.listen(httpPort, () => {
 // Notify that we're relying on Apache for SSL
 console.log('Running in HTTP mode only. SSL/HTTPS is managed by Apache.');
 console.log('The server is listening on port 3000 for proxied connections.'); 
-
-// <<< MOVE styles.css ROUTE HERE >>>
-// Explicitly serve styles.css from the project root
-app.get('/styles.css', (req, res) => {
-    console.log('[ROUTE HIT] Request received for /styles.css'); // <<< ADD THIS LOG
-    res.sendFile(path.join(__dirname, 'styles.css'), { 
-        headers: { 'Content-Type': 'text/css' } 
-    }, (err) => {
-        if (err) {
-            console.error(`Error sending styles.css: ${err.message}`);
-            res.status(404).send('Stylesheet not found.');
-        }
-    });
-});
-// <<< END styles.css ROUTE >>>
 
 
 
