@@ -594,60 +594,12 @@ app.use((req, res, next) => {
 });
 // <<< END LOGGING AFTER BODY PARSERS >>>
 
-// Security headers middleware
+// Security headers middleware - REMOVED (Handled by Apache)
+/* // <<< TEMPORARILY COMMENT OUT ENTIRE CSP MIDDLEWARE BLOCK FOR DEBUGGING
 app.use((req, res, next) => {
-    // Prevent browsers from detecting MIME types incorrectly
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    
-    // Prevent clickjacking
-    res.setHeader('X-Frame-Options', 'DENY');
-    
-    // XSS protection (obsolete but often kept for older browsers)
-    res.setHeader('X-XSS-Protection', '1; mode=block');
-    
-    // Referrer policy
-    res.setHeader('Referrer-Policy', 'same-origin');
-    
-    // HTTP Strict Transport Security (force HTTPS)
-    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-
-    // --- ADD CSP LOGIC HERE ---
-    // Ensure nonce generation/usage is completely removed
-
-    const cspDirectives = [
-        "default-src 'self'", 
-        // Allow scripts from Stripe, CDN, specific domains, inline scripts/eval (REMOVED 'self')
-        "script-src https://js.stripe.com https://cdn.jsdelivr.net http://s15.ierg4210.ie.cuhk.edu.hk:3000 https://s15.ierg4210.ie.cuhk.edu.hk 'unsafe-inline' 'unsafe-eval'", 
-        // Allow styles from CDN, specific domains, inline styles (REMOVED 'self')
-        "style-src https://cdn.jsdelivr.net http://s15.ierg4210.ie.cuhk.edu.hk:3000 https://s15.ierg4210.ie.cuhk.edu.hk 'unsafe-inline'",
-        // Allow images from self, data URIs, your domains
-        "img-src 'self' data: http://s15.ierg4210.ie.cuhk.edu.hk:3000 https://s15.ierg4210.ie.cuhk.edu.hk",
-        "form-action 'self'", // Forms can only submit to same origin
-        "frame-src 'self' https://js.stripe.com", // Allow Stripe frames
-        // Allow connections to self, Stripe API, your domains
-        "connect-src 'self' https://api.stripe.com http://s15.ierg4210.ie.cuhk.edu.hk:3000 https://s15.ierg4210.ie.cuhk.edu.hk",
-        // Allow fonts from self, CDNs, your domains
-        "font-src 'self' https://cdn.jsdelivr.net http://s15.ierg4210.ie.cuhk.edu.hk:3000 https://s15.ierg4210.ie.cuhk.edu.hk",
-        "media-src 'self'",
-        "object-src 'none'",
-        "base-uri 'self'",
-        // "upgrade-insecure-requests" // Often handled by HSTS and proxy, uncomment if needed
-    ];
-    // Apply the CSP header
-    res.setHeader('Content-Security-Policy', cspDirectives.join('; '));
-    // --- END CSP LOGIC --- 
-    
-    next();
+    // ... (OLD HEADER CODE)
 });
-
-// Generate a cryptographically secure CSP nonce  // REMOVE THIS FUNCTION
-/*
-const generateSecureNonce = () => {
-    // Use 16 bytes (128 bits) of randomness for the nonce
-    // This provides enough entropy to make nonces unguessable
-    return crypto.randomBytes(16).toString('base64');
-};
-*/
+*/ // <<< END TEMPORARY COMMENT OUT >>>
 
 // <<< START HTTPS REDIRECTION MIDDLEWARE >>>
 // Enforce HTTPS based on X-Forwarded-Proto header from Apache proxy
@@ -2085,7 +2037,7 @@ const server = app.listen(httpPort, () => {
 console.log('Running in HTTP mode only. SSL/HTTPS is managed by Apache.');
 console.log('The server is listening on port 3000 for proxied connections.'); 
 
-// <<< ADD ROUTE FOR styles.css >>>
+// <<< MOVE styles.css ROUTE HERE >>>
 // Explicitly serve styles.css from the project root
 app.get('/styles.css', (req, res) => {
     res.sendFile(path.join(__dirname, 'styles.css'), { 
@@ -2097,7 +2049,7 @@ app.get('/styles.css', (req, res) => {
         }
     });
 });
-// <<< END ROUTE FOR styles.css >>>
+// <<< END styles.css ROUTE >>>
 
 
 
