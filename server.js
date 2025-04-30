@@ -616,10 +616,10 @@ app.use((req, res, next) => {
 
     const cspDirectives = [
         "default-src 'self'", 
-        // Allow scripts from self, Stripe, CDN, inline scripts/eval
-        "script-src 'self' https://js.stripe.com https://cdn.jsdelivr.net http://s15.ierg4210.ie.cuhk.edu.hk:3000 https://s15.ierg4210.ie.cuhk.edu.hk 'unsafe-inline' 'unsafe-eval'", 
-        // Allow styles from self, CDN, inline styles
-        "style-src 'self' https://cdn.jsdelivr.net http://s15.ierg4210.ie.cuhk.edu.hk:3000 https://s15.ierg4210.ie.cuhk.edu.hk 'unsafe-inline'",
+        // Allow scripts from Stripe, CDN, specific domains, inline scripts/eval (REMOVED 'self')
+        "script-src https://js.stripe.com https://cdn.jsdelivr.net http://s15.ierg4210.ie.cuhk.edu.hk:3000 https://s15.ierg4210.ie.cuhk.edu.hk 'unsafe-inline' 'unsafe-eval'", 
+        // Allow styles from CDN, specific domains, inline styles (REMOVED 'self')
+        "style-src https://cdn.jsdelivr.net http://s15.ierg4210.ie.cuhk.edu.hk:3000 https://s15.ierg4210.ie.cuhk.edu.hk 'unsafe-inline'",
         // Allow images from self, data URIs, your domains
         "img-src 'self' data: http://s15.ierg4210.ie.cuhk.edu.hk:3000 https://s15.ierg4210.ie.cuhk.edu.hk",
         "form-action 'self'", // Forms can only submit to same origin
