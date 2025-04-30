@@ -2014,6 +2014,17 @@ app.get('/', (req, res) => {
 });
 // <<< END HOMEPAGE ROUTE >>>
 
+// <<< ADD EXPLICIT ROUTE FOR REGISTER PAGE >>>
+app.get('/register.html', (req, res) => {
+    res.sendFile(path.join(__dirname, 'register.html'), (err) => {
+        if (err) {
+            console.error(`Error sending register.html: ${err.message}`);
+            res.status(500).send('Error loading registration page.');
+        }
+    });
+});
+// <<< END REGISTER PAGE ROUTE >>>
+
 // Add a catch-all route handler for 404 errors
 app.use((req, res, next) => {
     // API routes should return JSON
