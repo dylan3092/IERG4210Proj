@@ -119,14 +119,18 @@ const authUtils = {
     
     // Authentication middleware with enhanced security and logging
     authenticate: (req, res, next) => {
-        if (authUtils.isAuthenticated(req)) {
+        const isAuthenticated = authUtils.isAuthenticated(req);
+        const ipAddress = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+        const isAPIRequest = !req.accepts('html'); // Simplified check for API
+        
+        console.log(`[AUTH MIDDLEWARE] Path: ${req.originalUrl}, Method: ${req.method}, Authenticated: ${isAuthenticated}, IsAPI: ${isAPIRequest}, SessionID: ${req.session?.id}`); // <<< ADD AUTH LOG
+        
+        if (isAuthenticated) {
             // Log authentication success
-            const ipAddress = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
             console.log(`[AUTH SUCCESS] User ${req.session.userEmail} authenticated from ${ipAddress}`);
             next();
         } else {
             // Log authentication failure
-            const ipAddress = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
             console.log(`[AUTH FAILURE] Unauthenticated access attempt from ${ipAddress} to ${req.method} ${req.originalUrl}`);
             
             // Clear any existing invalid sessions
@@ -138,30 +142,32 @@ const authUtils = {
                     // Clear the session cookie
                     res.clearCookie('neon_session');
                     
-                    // Redirect to login page for HTML requests
-                    if (req.accepts('html')) {
+                    // Decide response based on request type
+                    if (isAPIRequest) {
+                        console.log('[AUTH FAILURE] Responding with 401 JSON for API request'); // <<< ADD API FAIL LOG
+                        return res.status(401).json({ 
+                            error: 'Authentication required',
+                            message: 'You must be logged in to access this resource',
+                            code: 'AUTH_REQUIRED'
+                        });
+                    } else {
+                        console.log('[AUTH FAILURE] Redirecting to login.html for HTML request'); // <<< ADD HTML FAIL LOG
                         return res.redirect('/login.html');
                     }
-                    
-                    // Return JSON error for API requests
-                    res.status(401).json({ 
-                        error: 'Authentication required',
-                        message: 'You must be logged in to access this resource',
-                        code: 'AUTH_REQUIRED'
-                    });
                 });
             } else {
-                // Redirect to login page for HTML requests
-                if (req.accepts('html')) {
-                    return res.redirect('/login.html');
-                }
-                
-                // Return JSON error for API requests
-                res.status(401).json({ 
-                    error: 'Authentication required',
-                    message: 'You must be logged in to access this resource',
-                    code: 'AUTH_REQUIRED'
-                });
+                // Decide response based on request type (no session to destroy)
+                 if (isAPIRequest) {
+                     console.log('[AUTH FAILURE] Responding with 401 JSON for API request (no session)');
+                     return res.status(401).json({ 
+                         error: 'Authentication required',
+                         message: 'You must be logged in to access this resource',
+                         code: 'AUTH_REQUIRED'
+                     });
+                 } else {
+                     console.log('[AUTH FAILURE] Redirecting to login.html for HTML request (no session)');
+                     return res.redirect('/login.html');
+                 }
             }
         }
     },
@@ -1719,6 +1725,12 @@ app.get('/api/admin/orders', authUtils.authorizeAdmin, async (req, res) => {
 // =========================================================================
 // == USER ORDER HISTORY API
 // =========================================================================
+// <<< ADD LOG BEFORE ROUTE DEFINITION >>>
+app.use('/api/user/orders', (req, res, next) => {
+    console.log(`[PRE-HANDLER LOG] Request hit /api/user/orders path. Method: ${req.method}`);
+    next();
+});
+// <<< END PRE-HANDLER LOG >>>
 app.get('/api/user/orders', authUtils.authenticate, async (req, res) => {
     const userId = req.session.userId; // Get user ID from session
     console.log(`[API /api/user/orders] Request received for user ID: ${userId}`);
