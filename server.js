@@ -2025,6 +2025,18 @@ app.get('/register.html', (req, res) => {
 });
 // <<< END REGISTER PAGE ROUTE >>>
 
+// <<< ADD EXPLICIT ROUTE FOR /index.html PAGE >>>
+app.get('/index.html', (req, res) => {
+    // Serve the same index.html file as the root route
+    res.sendFile(path.join(__dirname, 'index.html'), (err) => {
+        if (err) {
+            console.error(`Error sending index.html (explicit path): ${err.message}`);
+            res.status(500).send('Error loading homepage.');
+        }
+    });
+});
+// <<< END /index.html PAGE ROUTE >>>
+
 // Add a catch-all route handler for 404 errors
 app.use((req, res, next) => {
     // API routes should return JSON
