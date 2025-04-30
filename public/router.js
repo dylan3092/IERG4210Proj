@@ -57,9 +57,6 @@ class Router {
             // Navigate to the link
             this.navigate(link.href);
         });
-
-        // Handle initial route
-        this.handleRouteChange(window.location.pathname + window.location.search);
     }
 
     // Register a route handler
