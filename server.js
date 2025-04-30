@@ -612,14 +612,14 @@ app.use((req, res, next) => {
     res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
 
     // --- ADD CSP LOGIC HERE ---
-    const nonce = generateSecureNonce(); // Generate nonce for this request
-    res.locals.cspNonce = nonce; // Make nonce available to templates if needed (though not currently used)
+    // const nonce = generateSecureNonce(); // REMOVE Nonce Generation
+    // res.locals.cspNonce = nonce; // REMOVE Nonce from locals
 
     const cspDirectives = [
         "default-src 'self'", // Default fallback - deny by default
         // Allow scripts from self, your specific domains, inline scripts, and Stripe/CDN
-        // Added 'unsafe-inline' for event handlers and inline scripts
-        `script-src 'self' https://js.stripe.com https://cdn.jsdelivr.net http://s15.ierg4210.ie.cuhk.edu.hk:3000 https://s15.ierg4210.ie.cuhk.edu.hk 'nonce-${nonce}' 'unsafe-inline' 'unsafe-eval'`, 
+        // REMOVED nonce-${nonce}' to allow 'unsafe-inline' to work
+        `script-src 'self' https://js.stripe.com https://cdn.jsdelivr.net http://s15.ierg4210.ie.cuhk.edu.hk:3000 https://s15.ierg4210.ie.cuhk.edu.hk 'unsafe-inline' 'unsafe-eval'`, 
         // Allow styles from self, CDNs, your domains, and inline styles 
         "style-src 'self' https://cdn.jsdelivr.net http://s15.ierg4210.ie.cuhk.edu.hk:3000 https://s15.ierg4210.ie.cuhk.edu.hk 'unsafe-inline'",
         // Allow images from self, data URIs, your domains
@@ -641,6 +641,15 @@ app.use((req, res, next) => {
     
     next();
 });
+
+// Generate a cryptographically secure CSP nonce  // REMOVE THIS FUNCTION
+/*
+const generateSecureNonce = () => {
+    // Use 16 bytes (128 bits) of randomness for the nonce
+    // This provides enough entropy to make nonces unguessable
+    return crypto.randomBytes(16).toString('base64');
+};
+*/
 
 // <<< START HTTPS REDIRECTION MIDDLEWARE >>>
 // Enforce HTTPS based on X-Forwarded-Proto header from Apache proxy
@@ -906,13 +915,6 @@ const upload = multer({
         cb(new Error('Only images (jpg, jpeg, png, gif) are allowed!'));
     }
 });
-
-// Generate a cryptographically secure CSP nonce
-const generateSecureNonce = () => {
-    // Use 16 bytes (128 bits) of randomness for the nonce
-    // This provides enough entropy to make nonces unguessable
-    return crypto.randomBytes(16).toString('base64');
-};
 
 // Test database connection on server start
 pool.getConnection()
