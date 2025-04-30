@@ -642,16 +642,53 @@ app.use((req, res, next) => {
     next();
 });
 
-// Add CORS middleware first - before any CSRF or validation middleware
+// <<< START HTTPS REDIRECTION MIDDLEWARE >>>
+// Enforce HTTPS based on X-Forwarded-Proto header from Apache proxy
 app.use((req, res, next) => {
-    // Check if request is HTTP and not localhost
-    if (req.headers['x-forwarded-proto'] !== 'https' && req.hostname !== 'localhost' && req.hostname !== '127.0.0.1') {
-        // Redirect to HTTPS with same host and URL
-        return res.redirect(301, `https://${req.headers.host}${req.url}`);
+    // app.set('trust proxy', 1) ensures req.secure reflects X-Forwarded-Proto
+    // Redirect if not secure and the request is not coming from localhost
+    if (!req.secure && req.hostname !== 'localhost' && req.hostname !== '127.0.0.1') {
+        console.log(`Insecure request detected for host ${req.headers.host}, redirecting to HTTPS...`);
+        // Use req.originalUrl to preserve the full path and query string
+        return res.redirect(301, `https://${req.headers.host}${req.originalUrl}`);
     }
-    next();
+    // Proceed if the request is already secure or from localhost
+    next(); 
 });
+// <<< END HTTPS REDIRECTION MIDDLEWARE >>>
 
+// Add CORS middleware first - before any CSRF or validation middleware
+// Define allowed origins
+const allowedOrigins = [
+    'https://s15.ierg4210.ie.cuhk.edu.hk', // Your main domain
+    // Add any other trusted origins if necessary, e.g., 'http://localhost:8080' for local development
+];
+
+const corsOptions = {
+    origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        
+        if (allowedOrigins.indexOf(origin) !== -1) {
+            // Origin is in the allowed list
+            callback(null, true);
+        } else {
+            // Origin is not allowed
+            console.warn(`CORS blocked for origin: ${origin}`); // Log blocked attempts
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    credentials: true, // Allow cookies and authorization headers
+    methods: 'GET, PUT, POST, DELETE, OPTIONS', // Allowed HTTP methods
+    allowedHeaders: 'Origin, X-Requested-With, Content-Type, Accept, CSRF-Token, X-CSRF-Token', // Allowed headers
+    optionsSuccessStatus: 200 // For legacy browser compatibility with OPTIONS preflight
+};
+
+// Use the cors middleware with options
+app.use(cors(corsOptions));
+
+// Remove or comment out the old custom CORS middleware:
+/*
 app.use((req, res, next) => {
     // Set the specific origin instead of wildcard for credentials to work
     const origin = req.headers.origin;
@@ -676,6 +713,7 @@ app.use((req, res, next) => {
     
     next();
 });
+*/
 
 // Add request logging middleware
 app.use((req, res, next) => {
