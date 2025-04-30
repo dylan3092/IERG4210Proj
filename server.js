@@ -612,15 +612,13 @@ app.use((req, res, next) => {
     res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
 
     // --- ADD CSP LOGIC HERE ---
-    // const nonce = generateSecureNonce(); // REMOVE Nonce Generation
-    // res.locals.cspNonce = nonce; // REMOVE Nonce from locals
+    // Ensure nonce generation/usage is completely removed
 
     const cspDirectives = [
-        "default-src 'self'", // Default fallback - deny by default
-        // Allow scripts from self, your specific domains, inline scripts, and Stripe/CDN
-        // REMOVED nonce-${nonce}' to allow 'unsafe-inline' to work
-        `script-src 'self' https://js.stripe.com https://cdn.jsdelivr.net http://s15.ierg4210.ie.cuhk.edu.hk:3000 https://s15.ierg4210.ie.cuhk.edu.hk 'unsafe-inline' 'unsafe-eval'`, 
-        // Allow styles from self, CDNs, your domains, and inline styles 
+        "default-src 'self'", 
+        // Allow scripts from self, Stripe, CDN, inline scripts/eval
+        "script-src 'self' https://js.stripe.com https://cdn.jsdelivr.net http://s15.ierg4210.ie.cuhk.edu.hk:3000 https://s15.ierg4210.ie.cuhk.edu.hk 'unsafe-inline' 'unsafe-eval'", 
+        // Allow styles from self, CDN, inline styles
         "style-src 'self' https://cdn.jsdelivr.net http://s15.ierg4210.ie.cuhk.edu.hk:3000 https://s15.ierg4210.ie.cuhk.edu.hk 'unsafe-inline'",
         // Allow images from self, data URIs, your domains
         "img-src 'self' data: http://s15.ierg4210.ie.cuhk.edu.hk:3000 https://s15.ierg4210.ie.cuhk.edu.hk",
@@ -2086,6 +2084,20 @@ const server = app.listen(httpPort, () => {
 // Notify that we're relying on Apache for SSL
 console.log('Running in HTTP mode only. SSL/HTTPS is managed by Apache.');
 console.log('The server is listening on port 3000 for proxied connections.'); 
+
+// <<< ADD ROUTE FOR styles.css >>>
+// Explicitly serve styles.css from the project root
+app.get('/styles.css', (req, res) => {
+    res.sendFile(path.join(__dirname, 'styles.css'), { 
+        headers: { 'Content-Type': 'text/css' } 
+    }, (err) => {
+        if (err) {
+            console.error(`Error sending styles.css: ${err.message}`);
+            res.status(404).send('Stylesheet not found.');
+        }
+    });
+});
+// <<< END ROUTE FOR styles.css >>>
 
 
 
