@@ -506,105 +506,30 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Add Checkout Button Event Listener
     const checkoutButton = document.getElementById('checkout-btn');
-    const paypalForm = document.getElementById('paypal-cart-form');
-    const invoiceInput = document.getElementById('paypal-invoice');
-    const customInput = document.getElementById('paypal-custom');
+    // REMOVE PayPal element checks:
+    // const paypalForm = document.getElementById('paypal-cart-form'); 
+    // const invoiceInput = document.getElementById('paypal-invoice');
+    // const customInput = document.getElementById('paypal-custom');
 
-    if (checkoutButton && paypalForm && invoiceInput && customInput) {
+    // Modify condition to only check for the essential button
+    if (checkoutButton /* && other essential elements if any */) { 
+        // The actual event listener logic might be attached elsewhere or handled by CartUIController
+        // This block might just need to confirm the button exists, or could potentially be removed
+        // if the listener is guaranteed to be attached correctly by other means.
+        console.log('Checkout button (#checkout-btn) found. Listener should be attached elsewhere or is handled by CartUIController.');
+        
+        // If the checkout logic WAS here (like the PayPal logic was), ensure the correct 
+        // Stripe checkout logic (e.g., calling cartController.handleCheckout()) is triggered.
+        // Example (IF NEEDED - check if handleCheckout is called elsewhere first):
+        /*
         checkoutButton.addEventListener('click', async () => {
-            checkoutButton.disabled = true; // Disable button during processing
-            checkoutButton.textContent = 'Processing...';
-
-            // 1. Get Cart Items (pid and quantity only)
-            const itemsToValidate = Object.values(cart.items).map(item => ({
-                pid: item.productId,
-                quantity: item.quantity
-            }));
-
-            if (itemsToValidate.length === 0) {
-                alert('Your cart is empty.');
-                checkoutButton.disabled = false; // Re-enable
-                checkoutButton.textContent = 'Checkout';
-                return;
-            }
-
-            try {
-                // 2. Send AJAX request to server
-                const response = await fetch('/api/create-order', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        // Include CSRF token
-                        'X-CSRF-Token': sessionStorage.getItem('csrfToken')
-                    },
-                    credentials: 'include', // Send session cookies
-                    body: JSON.stringify({ items: itemsToValidate })
-                });
-
-                if (response.ok) {
-                    const result = await response.json(); 
-
-                    // 3. Populate static hidden fields
-                    invoiceInput.value = result.orderId;
-                    customInput.value = result.digest;
-
-                    // --- Explicitly update dynamic item fields RIGHT BEFORE submission ---
-                    console.log('[Checkout] Explicitly calling updatePaypalFormFields...');
-                    updatePaypalFormFields(cart.items); // Call the function directly here
-                    console.log('[Checkout] updatePaypalFormFields finished.');
-                    // --- End explicit update ---
-
-                    // Log form data just before submission attempt
-                    console.log('[Checkout] Logging FormData before submission...');
-                    try {
-                        const formData = new FormData(paypalForm);
-                        for (let [key, value] of formData.entries()) { 
-                            console.log(`  FormData Entry: ${key}=${value}`);
-                        }
-                    } catch (e) {
-                        console.error('Error creating or logging FormData:', e);
-                    }
-                    console.log('[Checkout] paypal-items-container innerHTML:', document.getElementById('paypal-items-container')?.innerHTML);
-
-                    // 4. Clear local cart - REMOVED AGAIN - Cannot reliably clear after submit, and clearing before breaks payload.
-                    // cart.clear(); 
-
-                    // 5. Submit PayPal form using a temporary submit button
-                    console.log('Order validated (ID:', result.orderId, '). Preparing to submit to PayPal...');
-                    
-                    // Create a temporary submit button
-                    const tempSubmitButton = document.createElement('button');
-                    tempSubmitButton.type = 'submit';
-                    tempSubmitButton.style.display = 'none'; // Hide it
-                    
-                    // Append it to the form
-                    paypalForm.appendChild(tempSubmitButton);
-                    
-                    // Use setTimeout to ensure button is registered before click
-                    setTimeout(() => {
-                        console.log('Clicking temporary submit button...');
-                        tempSubmitButton.click(); 
-                        // Optional: Remove the button after clicking (though page navigation will likely happen first)
-                        // paypalForm.removeChild(tempSubmitButton);
-                    }, 200); // Keep a small delay just in case
-
-                } else {
-                    // Handle errors from the server
-                    const errorData = await response.json();
-                    alert(`Checkout failed: ${errorData.error || 'Unknown server error.'}`);
-                    checkoutButton.disabled = false; // Re-enable
-                    checkoutButton.textContent = 'Checkout';
-                }
-
-            } catch (error) {
-                console.error('Checkout AJAX error:', error);
-                alert('Checkout failed due to a network or client-side error.');
-                checkoutButton.disabled = false; // Re-enable
-                checkoutButton.textContent = 'Checkout';
-            }
+            await cartController.handleCheckout(); 
         });
+        */
+
     } else {
-        console.error('Checkout button or PayPal form/fields not found!');
+        // This error should now only trigger if the #checkout-btn itself is missing
+        console.error('Checkout button (#checkout-btn) not found!');
     }
 });
 

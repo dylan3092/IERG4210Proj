@@ -288,19 +288,37 @@
 
         try {
             const response = await fetch('/api/user/orders', { credentials: 'include' }); // Use relative path
+            
+            // Check response status first
             if (!response.ok) {
                 let errorMsg = `Error ${response.status}: ${response.statusText}`;
+                const contentType = response.headers.get("content-type");
+                
                 if (response.status === 401) {
-                    errorMsg = 'Please log in to view history.';
-                } else {
+                    errorMsg = 'Session expired or invalid. Please log in again to view history.';
+                    // Optionally redirect to login
+                    // window.location.href = '/login.html';
+                } else if (contentType && contentType.indexOf("application/json") !== -1) {
+                    // Try to parse JSON error message from server if available
                     try {
                          const errData = await response.json();
                          errorMsg = errData.error || errorMsg;
-                    } catch(e) { /* ignore */ }
+                    } catch(e) { /* ignore parsing error */ }
+                } else {
+                    // Handle non-JSON error responses (like HTML error pages)
+                    errorMsg = `Server returned an unexpected response (${response.status}). Check server logs.`;
                 }
                 throw new Error(errorMsg);
             }
 
+            // Check content type BEFORE parsing JSON
+            const contentType = response.headers.get("content-type");
+            if (!contentType || contentType.indexOf("application/json") === -1) {
+                // Handle cases where the server unexpectedly returned non-JSON for a 2xx response
+                throw new Error('Received non-JSON response from server for order history.');
+            }
+            
+            // Now safe to parse JSON
             const orders = await response.json();
 
             if (orders.length === 0) {
