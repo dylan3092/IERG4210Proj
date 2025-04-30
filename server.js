@@ -420,7 +420,7 @@ const validateOrigin = (req, res, next) => {
 //app.use(express.static(__dirname)); // Serve files from the root directory
 app.use(express.static(path.join(__dirname, 'public')));  // Serve files from the public directory
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-app.use('/js', express.static(path.join(__dirname, 'public/js')));
+// app.use('/js', express.static(path.join(__dirname, 'public/js'))); // REMOVE THIS LINE
 
 // <<< ADD EARLY LOGGING MIDDLEWARE HERE >>>
 app.use((req, res, next) => {
@@ -617,10 +617,10 @@ app.use((req, res, next) => {
 
     const cspDirectives = [
         "default-src 'self'", // Default fallback - deny by default
-        // Allow scripts from self, your specific domains, and inline scripts with nonce
-        // Added 'unsafe-eval' for potential library use, review if possible to remove
-        `script-src 'self' https://js.stripe.com https://cdn.jsdelivr.net http://s15.ierg4210.ie.cuhk.edu.hk:3000 https://s15.ierg4210.ie.cuhk.edu.hk 'nonce-${nonce}' 'unsafe-eval'`, 
-        // Allow styles from self, CDNs, your domains, and inline styles (consider removing 'unsafe-inline' if possible)
+        // Allow scripts from self, your specific domains, inline scripts, and Stripe/CDN
+        // Added 'unsafe-inline' for event handlers and inline scripts
+        `script-src 'self' https://js.stripe.com https://cdn.jsdelivr.net http://s15.ierg4210.ie.cuhk.edu.hk:3000 https://s15.ierg4210.ie.cuhk.edu.hk 'nonce-${nonce}' 'unsafe-inline' 'unsafe-eval'`, 
+        // Allow styles from self, CDNs, your domains, and inline styles 
         "style-src 'self' https://cdn.jsdelivr.net http://s15.ierg4210.ie.cuhk.edu.hk:3000 https://s15.ierg4210.ie.cuhk.edu.hk 'unsafe-inline'",
         // Allow images from self, data URIs, your domains
         "img-src 'self' data: http://s15.ierg4210.ie.cuhk.edu.hk:3000 https://s15.ierg4210.ie.cuhk.edu.hk",
