@@ -2039,6 +2039,19 @@ app.post('/api/create-checkout-session', authUtils.authenticate, async (req, res
     }
 });
 
+// <<< ADD EXPLICIT ROUTE FOR HOMEPAGE >>>
+app.get('/', (req, res) => {
+    // Ensure index.html exists in the root directory
+    res.sendFile(path.join(__dirname, 'index.html'), (err) => {
+        if (err) {
+            console.error(`Error sending index.html: ${err.message}`);
+            // If index.html can't be sent for some reason, fall back to a generic error or 404
+            res.status(500).send('Error loading homepage.');
+        }
+    });
+});
+// <<< END HOMEPAGE ROUTE >>>
+
 // Add a catch-all route handler for 404 errors
 app.use((req, res, next) => {
     // API routes should return JSON
