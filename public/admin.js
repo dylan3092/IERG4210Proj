@@ -349,9 +349,9 @@ const loadOrders = async () => {
     const ordersTableBody = document.getElementById('orders-table-body');
     if (!ordersTableBody) {
         console.error('Orders table body element not found!');
-        return;
-    }
-
+            return;
+        }
+        
     ordersTableBody.innerHTML = '<tr><td colspan="8" class="text-center">Loading orders...</td></tr>'; // Show loading state
 
     try {
@@ -382,7 +382,7 @@ const loadOrders = async () => {
                 
                 // Format date nicely
                 const orderDate = new Date(order.order_date).toLocaleString();
-
+        
                 // Create item summary (e.g., "Item1 (x2), Item2 (x1)")
                 let itemSummary = order.items.map(item => 
                     `${item.product_name || 'Unknown'} (x${item.quantity})`
@@ -392,8 +392,8 @@ const loadOrders = async () => {
                 }
                 if (!itemSummary) {
                     itemSummary = 'No items recorded';
-                }
-                
+        }
+        
                 // Optional: Shorten Stripe Session ID for display
                 const shortSessionId = order.stripe_session_id 
                     ? order.stripe_session_id.substring(0, 15) + '...' 
@@ -453,8 +453,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             console.warn('Authentication failed or user is not admin. Redirecting to login.');
             window.location.href = '/login.html?error=admin_required';
             return; // Stop further execution
-        }
-        
+    }
+    
         // Auth successful, show page content
         document.body.style.visibility = 'visible';
         if(authLoader) authLoader.style.display = 'none'; // Hide loader
@@ -481,7 +481,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // setTimeout(() => window.location.href = '/login.html?error=auth_check_failed', 3000);
         return; // Stop if auth check fails
     }
-
+    
     // Attach form handlers
     const categoryForm = document.getElementById('category-form');
     const productForm = document.getElementById('product-form');

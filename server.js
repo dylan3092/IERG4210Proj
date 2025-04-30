@@ -170,7 +170,7 @@ const authUtils = {
     authorizeAdmin: (req, res, next) => {
         const isAuthenticated = authUtils.isAuthenticated(req);
         const isAdmin = authUtils.isAdmin(req);
-        const ipAddress = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+            const ipAddress = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
         console.log(`[authorizeAdmin Check] Path: ${req.originalUrl}, Authenticated: ${isAuthenticated}, IsAdmin: ${isAdmin}, Session User:`, req.session.userEmail);
         
         if (isAuthenticated && isAdmin) {
@@ -417,10 +417,10 @@ const validateOrigin = (req, res, next) => {
 };
 
 // Middleware
-app.use(express.static(__dirname)); // Serve files from the root directory
-app.use(express.static('public'));  // Serve files from the public directory
-app.use('/uploads', express.static('uploads'));
-app.use('/js', express.static('public/js'));
+//app.use(express.static(__dirname)); // Serve files from the root directory
+app.use(express.static(path.join(__dirname, 'public')));  // Serve files from the public directory
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/js', express.static(path.join(__dirname, 'public/js')));
 
 // <<< ADD EARLY LOGGING MIDDLEWARE HERE >>>
 app.use((req, res, next) => {
@@ -689,7 +689,7 @@ app.use(cookieParser());
 // Skip CSRF for login, logout, and API routes
 app.use((req, res, next) => {
     // For login and logout endpoints, completely bypass protection
-    if (req.path === '/api/login' || req.path === '/api/logout') { 
+    if (req.path === '/api/login' || req.path === '/api/logout') {
         console.log('Completely bypassing protection for endpoint:', req.path);
         next();
         return;
@@ -703,7 +703,7 @@ app.use((req, res, next) => {
     } else {
         // For all other routes, apply CSRF protection (injection and origin validation)
         csrfProtection.injectToken(req, res, () => {
-            validateOrigin(req, res, next);
+                validateOrigin(req, res, next);
         });
     }
 });
@@ -1322,13 +1322,13 @@ app.post('/api/login', async (req, res) => {
                 
                 console.log('Session saved after rotation. Sending success response.');
                 // Return success response AFTER session is saved
-                return res.status(200).json({ 
-                    success: true,
-                    user: {
-                        email: user.email,
-                        isAdmin: sessionData.is_admin
-                    }
-                });
+            return res.status(200).json({ 
+                success: true,
+                user: {
+                    email: user.email,
+                    isAdmin: sessionData.is_admin
+                }
+            });
             });
 
         } catch (sessionError) {
