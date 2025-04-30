@@ -193,11 +193,11 @@ async function homeHandler(params) {
         if (categoryId) {
             const selectedCategory = categoriesCache.find(c => c.catid == categoryId);
             if (selectedCategory) {
-                document.title = `${sanitize.html(selectedCategory.name)} - Dummy Shopping`;
+                document.title = `${sanitize.html(selectedCategory.name)} - Neon Shopping`;
                 updateBreadcrumb(sanitize.html(selectedCategory.name));
             }
         } else {
-            document.title = 'Dummy Shopping - Home';
+            document.title = 'Neon Shopping - Home';
             updateBreadcrumb();
         }
         
@@ -254,7 +254,7 @@ async function productHandler(params) {
         const product = await productResponse.json();
         
         // Update page title
-        document.title = `${sanitize.html(product.name)} - Dummy Shopping`;
+        document.title = `${sanitize.html(product.name)} - Neon Shopping`;
         
         // Update breadcrumb using category_name from API
         updateBreadcrumb(sanitize.html(product.category_name), sanitize.html(product.name));
