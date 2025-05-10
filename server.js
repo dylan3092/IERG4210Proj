@@ -15,6 +15,7 @@ const multer = require('multer');
 const crypto = require('crypto');
 const xss = require('xss');
 const https = require('https'); // Also import https at the top
+const sharp = require('sharp'); // <<< ADD THIS LINE
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY); // <<<<<< ADD STRIPE
 
 const app = express();
