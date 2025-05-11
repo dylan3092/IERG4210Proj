@@ -1572,12 +1572,11 @@ app.get('/admin', authUtils.authorizeAdmin, (req, res) => {
 });
 
 app.get('/admin.html', authUtils.authorizeAdmin, (req, res) => {
-    const filePath = path.join(__dirname, 'public', 'admin.html');
+    const filePath = path.join(__dirname, 'admin.html'); // Serve from project root
     console.log(`[SERVER] Attempting to send file for /admin.html from path: ${filePath}`);
     res.sendFile(filePath, (err) => {
         if (err) {
             console.error(`[SERVER ERROR] Failed to send admin.html. Path: ${filePath}. Error: ${err.message}`, err);
-            // Avoid sending another response if headers already sent or error is minor
             if (!res.headersSent) {
                  res.status(500).json({ error: 'Server error loading admin page.', details: err.message, code: err.code });
             }
@@ -1589,7 +1588,7 @@ app.get('/admin.html', authUtils.authorizeAdmin, (req, res) => {
 
 // Add specific route for member page - protected with authentication
 app.get('/member.html', authUtils.authenticate, (req, res) => {
-    const filePath = path.join(__dirname, 'public', 'member.html');
+    const filePath = path.join(__dirname, 'member.html'); // Serve from project root
     console.log(`[SERVER] Attempting to send file for /member.html from path: ${filePath}`);
     res.sendFile(filePath, (err) => {
         if (err) {
