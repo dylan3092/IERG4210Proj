@@ -45,8 +45,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 // Load categories once and cache them
 async function loadCategories() {
     try {
-        console.log(`Attempting to fetch categories from: ${BASE_URL}/categories`);
-        const response = await fetch(`${BASE_URL}/categories`);
+        console.log(`Attempting to fetch categories from: ${BASE_URL}/api/categories`);
+        const response = await fetch(`${BASE_URL}/api/categories`);
         
         if (!response.ok) {
             console.error('Failed to load categories:', response.status, response.statusText);
@@ -140,8 +140,8 @@ async function homeHandler(params) {
     try {
         // Fetch products based on category
         const productsUrl = categoryId 
-            ? `${BASE_URL}/products?category=${sanitize.html(categoryId)}`
-            : `${BASE_URL}/products`;
+            ? `${BASE_URL}/api/categories/${sanitize.html(categoryId)}/products`
+            : `${BASE_URL}/api/products`;
             
         console.log(`Fetching products from: ${productsUrl}`);
         
@@ -246,7 +246,7 @@ async function productHandler(params) {
     
     try {
         // Fetch product details
-        const productResponse = await fetch(`${BASE_URL}/products/${sanitize.html(productId)}`); 
+        const productResponse = await fetch(`${BASE_URL}/api/products/${sanitize.html(productId)}`);
         if (!productResponse.ok) {
             // Handle product not found or other errors
             console.error('Failed to load product:', productResponse.status, productResponse.statusText);
