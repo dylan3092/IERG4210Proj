@@ -1572,22 +1572,33 @@ app.get('/admin', authUtils.authorizeAdmin, (req, res) => {
 });
 
 app.get('/admin.html', authUtils.authorizeAdmin, (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+    const filePath = path.join(__dirname, 'public', 'admin.html');
+    console.log(`[SERVER] Attempting to send file for /admin.html from path: ${filePath}`);
+    res.sendFile(filePath, (err) => {
+        if (err) {
+            console.error(`[SERVER ERROR] Failed to send admin.html. Path: ${filePath}. Error: ${err.message}`, err);
+            // Avoid sending another response if headers already sent or error is minor
+            if (!res.headersSent) {
+                 res.status(500).json({ error: 'Server error loading admin page.', details: err.message, code: err.code });
+            }
+        } else {
+            console.log(`[SERVER] Successfully sent admin.html from ${filePath}`);
+        }
+    });
 });
 
 // Add specific route for member page - protected with authentication
 app.get('/member.html', authUtils.authenticate, (req, res) => {
-    // authUtils.authenticate ensures the user is logged in.
-    // The client-side JavaScript (member.js) will handle:
-    // 1. Redirecting to login if somehow accessed without session (though authenticate should catch this).
-    // 2. Redirecting to admin panel if the user is an admin.
-    res.sendFile(path.join(__dirname, 'public', 'member.html'), (err) => {
+    const filePath = path.join(__dirname, 'public', 'member.html');
+    console.log(`[SERVER] Attempting to send file for /member.html from path: ${filePath}`);
+    res.sendFile(filePath, (err) => {
         if (err) {
-            console.error(`[SERVER ERROR] Failed to send member.html for user ${req.session?.userEmail || 'Unknown'}:`, err);
-            // Avoid sending another response if headers already sent or error is minor
+            console.error(`[SERVER ERROR] Failed to send member.html for user ${req.session?.userEmail || 'Unknown'}. Path: ${filePath}. Error: ${err.message}`, err);
             if (!res.headersSent) {
-                 res.status(500).send('Error loading member page.');
+                 res.status(500).json({ error: 'Server error loading member page.', details: err.message, code: err.code });
             }
+        } else {
+            console.log(`[SERVER] Successfully sent member.html from ${filePath}`);
         }
     });
 });
