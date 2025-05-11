@@ -36,17 +36,22 @@ const applyCsrf = (config = {}) => {
 
 // Enhanced fetch function with CSRF protection
 const safeFetch = async (url, options = {}) => {
-    // Apply CSRF token to the request
-    const configWithCsrf = applyCsrf(options);
-    
-    // Make the request
-    const response = await fetch(url, configWithCsrf);
-    
-    // If token is expired or invalid, try to refresh it and retry once
-    if (response.status === 403 && response.statusText.includes('CSRF')) {
-        await fetchCsrfToken();
-        configWithCsrf.headers['X-CSRF-Token'] = csrfToken;
-        return fetch(url, configWithCsrf);
+    let configWithCsrf = applyCsrf(options); 
+    let response = await fetch(url, configWithCsrf); 
+
+    if (response.status === 403) {
+        try {
+            const errorData = await response.clone().json(); 
+            if (errorData && errorData.error && errorData.error.toLowerCase().includes('csrf')) {
+                console.log('[safeFetch] CSRF error detected, attempting token refresh and retry...');
+                await fetchCsrfToken(); 
+                configWithCsrf.headers['X-CSRF-Token'] = csrfToken; 
+                response = await fetch(url, configWithCsrf); 
+                console.log('[safeFetch] Retry response status:', response.status);
+            }
+        } catch (e) {
+            console.warn('[safeFetch] Could not parse error response as JSON for 403 or error was not CSRF related.');
+        }
     }
     
     return response;
@@ -517,7 +522,7 @@ const handleChangePasswordSubmit = async (event) => {
     }
 
     try {
-        const response = await safeFetch(`${BASE_URL}/api/change-password`, { 
+        const responseFromSafeFetch = await safeFetch(`${BASE_URL}/api/change-password`, { 
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -525,14 +530,17 @@ const handleChangePasswordSubmit = async (event) => {
             body: JSON.stringify({ currentPassword, newPassword })
         });
 
-        const result = await response.json(); 
+        const result = await responseFromSafeFetch.json(); 
 
-        if (!response.ok) {
-            throw new Error(result.error || `Failed to change password: ${response.statusText}`);
+        if (!responseFromSafeFetch.ok) {
+            throw new Error(result.error || `Failed to change password: ${responseFromSafeFetch.statusText}`);
         }
         
         showMessage(result.message || 'Password changed successfully! Please log in again.');
         form.reset();
+        
+        // Redirect to login page as the session was destroyed by the server
+        // This ensures a fresh session and CSRF token upon next login.
         window.location.href = '/login.html?status=password_changed';
 
     } catch (error) {
