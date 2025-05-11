@@ -1,3 +1,4 @@
+console.log('[AdminJS] Initializing, csrfToken should be empty now.');
 // API endpoints
 const API = {
     categories: `${BASE_URL}/categories`,
@@ -14,46 +15,42 @@ const fetchCsrfToken = async () => {
         const response = await fetch(API.csrfToken);
         const data = await response.json();
         csrfToken = data.csrfToken;
-        console.log('CSRF token fetched');
+        console.log('[AdminJS fetchCsrfToken] CSRF token fetched and stored:', csrfToken);
     } catch (error) {
-        console.error('Failed to fetch CSRF token:', error);
+        console.error('[AdminJS fetchCsrfToken] Failed to fetch CSRF token:', error);
+        csrfToken = 'ERROR_FETCHING_TOKEN';
     }
 };
 
 // Apply CSRF token to a fetch request configuration
 const applyCsrf = (config = {}) => {
-    // Create a new config object to avoid modifying the original
     const newConfig = { ...config };
-    
-    // Initialize headers if they don't exist
     newConfig.headers = newConfig.headers || {};
-    
-    // Add CSRF token as a header
     newConfig.headers['X-CSRF-Token'] = csrfToken;
-    
+    console.log('[AdminJS applyCsrf] Applying token to request headers:', csrfToken);
     return newConfig;
 };
 
 // Enhanced fetch function with CSRF protection
 const safeFetch = async (url, options = {}) => {
-    let configWithCsrf = applyCsrf(options); 
-    let response = await fetch(url, configWithCsrf); 
+    console.log('[AdminJS safeFetch] Called for URL:', url, 'Global csrfToken is:', csrfToken);
+    let configWithCsrf = applyCsrf(options);
+    let response = await fetch(url, configWithCsrf);
 
     if (response.status === 403) {
         try {
-            const errorData = await response.clone().json(); 
+            const errorData = await response.clone().json();
             if (errorData && errorData.error && errorData.error.toLowerCase().includes('csrf')) {
-                console.log('[safeFetch] CSRF error detected, attempting token refresh and retry...');
-                await fetchCsrfToken(); 
-                configWithCsrf.headers['X-CSRF-Token'] = csrfToken; 
-                response = await fetch(url, configWithCsrf); 
-                console.log('[safeFetch] Retry response status:', response.status);
+                console.log('[AdminJS safeFetch] CSRF error detected, attempting token refresh and retry...');
+                await fetchCsrfToken();
+                configWithCsrf.headers['X-CSRF-Token'] = csrfToken;
+                response = await fetch(url, configWithCsrf);
+                console.log('[AdminJS safeFetch] Retry response status:', response.status);
             }
         } catch (e) {
-            console.warn('[safeFetch] Could not parse error response as JSON for 403 or error was not CSRF related.');
+            console.warn('[AdminJS safeFetch] Could not parse error response as JSON for 403 or error was not CSRF related.');
         }
     }
-    
     return response;
 };
 
@@ -468,16 +465,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         // Now fetch CSRF token since user is authenticated
         await fetchCsrfToken();
-        
-        // Inject CSRF token into forms
-        const csrfCategoryPlaceholder = document.getElementById('csrf-category-placeholder');
-        const csrfProductPlaceholder = document.getElementById('csrf-product-placeholder');
-        if (csrfCategoryPlaceholder) {
-            csrfCategoryPlaceholder.innerHTML = `<input type="hidden" name="_csrf" value="${csrfToken}">`;
-        }
-        if (csrfProductPlaceholder) {
-            csrfProductPlaceholder.innerHTML = `<input type="hidden" name="_csrf" value="${csrfToken}">`;
-        }
+        console.log('[AdminJS DOMContentLoaded] Initial CSRF token fetch complete. Global csrfToken is:', csrfToken);
 
     } catch (error) {
         console.error('Error checking auth status:', error);
@@ -506,11 +494,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.error("Error loading initial admin data:", error);
         showMessage("Failed to load some admin data. Please check console.", true);
     }
+
+    // Ensure event listener for password change form is attached
+    const changePasswordForm = document.getElementById('passwordChangeModalForm'); // Assuming this is the ID of the form *inside* the modal
+    if (changePasswordForm) {
+        changePasswordForm.addEventListener('submit', handleChangePasswordSubmit);
+        console.log('[AdminJS DOMContentLoaded] Event listener attached to passwordChangeModalForm.');
+    } else {
+        console.warn('[AdminJS DOMContentLoaded] Password change form (passwordChangeModalForm) not found!');
+    }
 }); 
 
 // Change Password
 const handleChangePasswordSubmit = async (event) => {
     event.preventDefault();
+    console.log('[AdminJS handleChangePasswordSubmit] Form submitted. Current global csrfToken:', csrfToken);
     const form = event.target;
     const currentPassword = form.elements['current-password'].value;
     const newPassword = form.elements['new-password'].value;
@@ -522,6 +520,7 @@ const handleChangePasswordSubmit = async (event) => {
     }
 
     try {
+        console.log('[AdminJS handleChangePasswordSubmit] About to call safeFetch. Token is:', csrfToken);
         const responseFromSafeFetch = await safeFetch(`${BASE_URL}/api/change-password`, { 
             method: 'POST',
             headers: {
@@ -529,21 +528,25 @@ const handleChangePasswordSubmit = async (event) => {
             },
             body: JSON.stringify({ currentPassword, newPassword })
         });
+        console.log('[AdminJS handleChangePasswordSubmit] Response received, status:', responseFromSafeFetch.status);
 
-        const result = await responseFromSafeFetch.json(); 
+        const result = await responseFromSafeFetch.json();
+        console.log('[AdminJS handleChangePasswordSubmit] Parsed JSON result:', result);
 
         if (!responseFromSafeFetch.ok) {
+            console.error('[AdminJS handleChangePasswordSubmit] Response not OK. Error from server:', result.error || responseFromSafeFetch.statusText);
             throw new Error(result.error || `Failed to change password: ${responseFromSafeFetch.statusText}`);
         }
         
+        console.log('[AdminJS handleChangePasswordSubmit] Password change apparently successful. Server message:', result.message);
         showMessage(result.message || 'Password changed successfully! Please log in again.');
         form.reset();
-        
-        // Redirect to login page as the session was destroyed by the server
-        // This ensures a fresh session and CSRF token upon next login.
+        console.log('[AdminJS handleChangePasswordSubmit] Form reset. Attempting redirect...');
         window.location.href = '/login.html?status=password_changed';
+        console.log('[AdminJS handleChangePasswordSubmit] Redirect initiated.');
 
     } catch (error) {
+        console.error('[AdminJS handleChangePasswordSubmit] Catch block error:', error.message);
         showMessage(error.message || 'An unexpected error occurred.', true);
     }
 }; 
