@@ -241,61 +241,78 @@ async function productHandler(params) {
     
     if (!productId) {
         router.navigate('index.html');
-        return '';
+        return ''; // Return empty string as content will be redirected
     }
     
     try {
         // Fetch product details
-        const productResponse = await fetch(`${BASE_URL}/products/${sanitize.html(productId)}`);
+        const productResponse = await fetch(`${BASE_URL}/products/${sanitize.html(productId)}`); 
         if (!productResponse.ok) {
-            throw new Error('Product not found');
+            // Handle product not found or other errors
+            console.error('Failed to load product:', productResponse.status, productResponse.statusText);
+            if (productResponse.status === 404) {
+                return '<p>Product not found.</p>';
+            }
+            return `<p>Error loading product: ${productResponse.statusText}</p>`;
         }
         
         const product = await productResponse.json();
         
+        // DEBUG: Log the product object to see its structure from main.js
+        console.log('Product object in main.js productHandler:', JSON.stringify(product, null, 2));
+
         // Update page title
         document.title = `${sanitize.html(product.name)} - Neon Shopping`;
-        
-        // Update breadcrumb using category_name from API
+
+        // Update breadcrumb
         updateBreadcrumb(sanitize.html(product.category_name), sanitize.html(product.name));
         
         // Highlight active category
         renderCategories();
-        
+
+        // --- NEW: Prepare discount HTML string ---
+        let discountHTML = '';
+        if (product.discount && product.discount.description) {
+            discountHTML = `<p class="product-discount-offer">${sanitize.html(product.discount.description)}</p>`;
+            console.log('[main.js productHandler] Discount HTML generated:', discountHTML);
+        }
+        // --- END: Prepare discount HTML string ---
+
         // Return HTML for product details
         return `
-            <div class="product-details">
-                <div class="product-image">
-                    <img src="${product.image ? 
-                        sanitize.url(`/uploads/${product.image}`) : 
-                        'images/default.jpg'}" 
-                        alt="${sanitize.html(product.name)}">
-                </div>
-                <div class="product-info">
-                    <h1>${sanitize.html(product.name)}</h1>
-                    <p class="category">Category: ${sanitize.html(product.category_name)}</p>
-                    <p class="price">$${sanitize.html(Number(product.price).toFixed(2))}</p>
-                    <p class="description">${sanitize.html(product.description)}</p>
-                    <div class="purchase-controls">
-                        <input type="number" id="quantity" value="1" min="1" max="99">
-                        <button onclick="addToCart(${sanitize.attribute(product.pid)}, document.getElementById('quantity').value)">
-                            Add to Cart
-                        </button>
+            <div class="product-image">
+                <img src="${product.image ? 
+                    sanitize.url(`/uploads/${product.image}`) : 
+                    'images/default.jpg'}" 
+                    alt="${sanitize.attribute(product.name)}">
+            </div>
+            <div class="product-info">
+                <h1>${sanitize.html(product.name)}</h1>
+                <p class="category">Category: ${sanitize.html(product.category_name)}</p>
+                <p class="price" id="main-product-price">$${sanitize.html(Number(product.price).toFixed(2))}</p> 
+                ${discountHTML} <!-- Inject discount HTML here -->
+                <p class="description">${sanitize.html(product.description)}</p>
+                <div class="purchase-controls">
+                    <div class="quantity-control">
+                        <input type="number" 
+                               id="quantity" 
+                               value="1" 
+                               min="1" 
+                               max="100"
+                               oninput="validateQuantity(this)"
+                               onkeypress="return event.charCode >= 48 && event.charCode <= 57">
+                        <div class="quantity-error"></div>
                     </div>
+                    <button onclick="addToCart(${sanitize.html(product.pid)}, document.getElementById('quantity').value)">
+                        Add to Cart
+                    </button>
                 </div>
             </div>
         `;
-        
+
     } catch (error) {
-        console.error('Error:', error);
-        return `
-            <div class="api-error">
-                <h2>Error Loading Product</h2>
-                <p>An error occurred: ${error.message}</p>
-                <p>This could be due to server connectivity issues or API configuration problems.</p>
-                <p><a href="index.html" target="_self">Return to Home Page</a></p>
-            </div>
-        `;
+        console.error('Error fetching product details:', error);
+        return '<p>Error loading product details. Please try again later.</p>';
     }
 }
 
