@@ -496,12 +496,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // Ensure event listener for password change form is attached
-    const changePasswordForm = document.getElementById('passwordChangeModalForm'); // Assuming this is the ID of the form *inside* the modal
+    const changePasswordForm = document.getElementById('password-change-form'); // Assuming this is the ID of the form *inside* the modal
     if (changePasswordForm) {
         changePasswordForm.addEventListener('submit', handleChangePasswordSubmit);
-        console.log('[AdminJS DOMContentLoaded] Event listener attached to passwordChangeModalForm.');
+        console.log('[AdminJS DOMContentLoaded] Event listener attached to password-change-form.');
     } else {
-        console.warn('[AdminJS DOMContentLoaded] Password change form (passwordChangeModalForm) not found!');
+        console.warn('[AdminJS DOMContentLoaded] Password change form (password-change-form) not found!');
     }
 }); 
 
