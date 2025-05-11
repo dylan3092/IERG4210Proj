@@ -1881,7 +1881,54 @@ app.post('/api/create-checkout-session', authUtils.authenticate, async (req, res
                  return res.status(500).json({ error: 'Internal server error during price validation.' });
             }
             const priceFromDb = parseFloat(product.price);
-            const itemTotal = priceFromDb * inputItem.quantity;
+            // let itemTotal = priceFromDb * inputItem.quantity; // Original itemTotal calculation
+
+            // --- NEW: BOGO Discount Logic ---
+            const [discountRules] = await connection.query(
+                "SELECT * FROM discounts WHERE product_id = ? AND discount_type = 'BOGO' AND is_active = TRUE LIMIT 1",
+                [product.pid]
+            );
+            const activeBogoRule = discountRules.length > 0 ? discountRules[0] : null;
+
+            let itemTotal;
+            let effectivePricePerUnitForDb = priceFromDb; // Default to original price
+
+            if (activeBogoRule) {
+                const cart_quantity = inputItem.quantity;
+                const buy_qty = activeBogoRule.bogo_buy_quantity;
+                const free_qty = activeBogoRule.bogo_get_free_quantity;
+
+                // Ensure BOGO rule parameters are valid (positive integers)
+                if (buy_qty > 0 && free_qty > 0) {
+                    const items_per_deal_cycle = buy_qty + free_qty;
+                    
+                    // Apply discount only if cart quantity is enough for at least one full deal cycle
+                    if (cart_quantity >= items_per_deal_cycle) {
+                        const num_deal_cycles = Math.floor(cart_quantity / items_per_deal_cycle);
+                        const num_free_items_for_this_product = num_deal_cycles * free_qty;
+                        const num_paid_items_for_this_product = cart_quantity - num_free_items_for_this_product;
+                        
+                        itemTotal = num_paid_items_for_this_product * priceFromDb;
+                        if (cart_quantity > 0) { // Avoid division by zero
+                            effectivePricePerUnitForDb = itemTotal / cart_quantity;
+                        }
+                        console.log(`[create-checkout] BOGO applied for PID ${product.pid}: ${num_paid_items_for_this_product} paid, ${num_free_items_for_this_product} free. Original item total: ${cart_quantity * priceFromDb}, New itemTotal: ${itemTotal.toFixed(2)}, Effective unit price: ${effectivePricePerUnitForDb.toFixed(2)}`);
+                    } else {
+                        // Not enough quantity for a full BOGO deal cycle
+                        itemTotal = cart_quantity * priceFromDb;
+                        console.log(`[create-checkout] BOGO not applied for PID ${product.pid}: quantity ${cart_quantity} less than deal cycle ${items_per_deal_cycle}`);
+                    }
+                } else {
+                    // Invalid BOGO rule parameters (e.g., buy_qty or free_qty is zero or less)
+                    itemTotal = cart_quantity * priceFromDb;
+                     console.warn(`[create-checkout] Invalid BOGO rule parameters for PID ${product.pid}. buy_qty: ${buy_qty}, free_qty: ${free_qty}`);
+                }
+            } else {
+                // No active BOGO rule for this product
+                itemTotal = cart_quantity * priceFromDb;
+            }
+            // --- END: BOGO Discount Logic ---
+            
             totalAmount += itemTotal;
 
             finalOrderItems.push({
@@ -1890,7 +1937,8 @@ app.post('/api/create-checkout-session', authUtils.authenticate, async (req, res
                 name: product.name, // Needed for Stripe line item
                 description: product.description, // Optional for Stripe
                 thumbnail: product.thumbnail, // Optional for Stripe
-                price_at_purchase: priceFromDb
+                // MODIFIED: Store the potentially discounted (effective) price per unit
+                price_at_purchase: parseFloat(effectivePricePerUnitForDb.toFixed(2))
             });
         }
         // Ensure total amount has max 2 decimal places
@@ -1935,6 +1983,7 @@ app.post('/api/create-checkout-session', authUtils.authenticate, async (req, res
                         description: item.description || undefined,
                         images: imageUrl ? [imageUrl] : undefined,
                     },
+                    // MODIFIED: Use item.price_at_purchase, which is the effective unit price after discount
                     unit_amount: Math.round(item.price_at_purchase * 100), // Price in cents!
                 },
                 quantity: item.quantity,
