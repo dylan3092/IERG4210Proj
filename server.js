@@ -309,9 +309,9 @@ const csrfProtection = {
             // Bail if token format is incorrect
             if (!hash || !timestamp) return false;
             
-            // Optional: Check if token is too old (e.g., more than 4 hours)
+            // Check if token is too old (more than 1 hour)
             const tokenAge = Date.now() - parseInt(timestamp, 10);
-            if (tokenAge > 4 * 60 * 60 * 1000) { // 4 hours
+            if (tokenAge > 1 * 60 * 60 * 1000) { // 1 hour
                 console.log('CSRF token expired');
                 return false;
             }
