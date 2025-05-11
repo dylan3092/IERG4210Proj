@@ -29,6 +29,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Update page title - Sanitize product name
         document.title = `${sanitize.html(product.name)} - Neon Shopping`;
 
+        // DEBUG: Log the product object to see its structure
+        console.log('Product object in product.js:', JSON.stringify(product, null, 2));
+
         // Update breadcrumb using category_name from API - Sanitize all values
         const breadcrumb = document.querySelector('.breadcrumb');
         breadcrumb.innerHTML = `
