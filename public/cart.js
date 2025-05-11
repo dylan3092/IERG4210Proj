@@ -240,7 +240,7 @@ class ShoppingCart {
     async fetchProductDetails(productId) {
         try {
             const sanitizedProductId = encodeURIComponent(sanitize.html(productId));
-            const response = await fetch(`${BASE_URL}/products/${sanitizedProductId}`);
+            const response = await fetch(`${BASE_URL}/api/products/${sanitizedProductId}`);
             if (!response.ok) {
                 throw new Error('Product not found');
             }
@@ -485,11 +485,10 @@ class CartUIController {
         try {
             // 2. Call backend to create the Stripe Checkout session
             console.log("[CartUIController.handleCheckout] Sending request to /api/create-checkout-session with data:", cartData);
-            const response = await fetch('/api/create-checkout-session', {
+            const response = await fetch(`${BASE_URL}/api/create-checkout-session`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    // Add CSRF token if your endpoint requires it (check server.js configuration)
                     'X-CSRF-Token': sessionStorage.getItem('csrfToken')
                 },
                 body: JSON.stringify(cartData),

@@ -167,13 +167,12 @@
     <p>IERG4210 Shop</p>
   </footer>
 
-  <!-- Add these scripts right before closing body tag -->
   <script>
+    // Inline script for BASE_URL and initial auth checks
     const BASE_URL = window.location.protocol === 'https:' ? 
-        'https://s15.ierg4210.ie.cuhk.edu.hk/api' : 
-        'http://s15.ierg4210.ie.cuhk.edu.hk:3000/api';
+        'https://s15.ierg4210.ie.cuhk.edu.hk' : 
+        'http://s15.ierg4210.ie.cuhk.edu.hk:3000';
     
-    // Check if user is logged in
     document.addEventListener('DOMContentLoaded', async () => {
       const userEmail = sessionStorage.getItem('userEmail');
       const isAdmin = sessionStorage.getItem('isAdmin');
@@ -184,39 +183,28 @@
       const adminLink = document.getElementById('admin-link');
       
       if (userEmail) {
-        // User is logged in
         userDisplay.textContent = userEmail;
         loginLink.style.display = 'none';
         registerLink.style.display = 'none';
         logoutLink.style.display = 'inline';
         
-        // Show admin link if user is admin
         if (isAdmin === 'true') {
           adminLink.style.display = 'inline';
         }
         
-        // Setup logout functionality
         logoutLink.addEventListener('click', async (e) => {
           e.preventDefault();
-          
           try {
-            const response = await fetch('/api/logout', {
+            const response = await fetch(`${BASE_URL}/api/logout`, { // Ensure /api/
               method: 'POST',
               credentials: 'include',
-              headers: {
-                'Content-Type': 'application/json'
-              }
+              headers: { 'Content-Type': 'application/json' }
             });
-            
             if (response.ok) {
-              // Clear session storage
               sessionStorage.removeItem('userEmail');
               sessionStorage.removeItem('isAdmin');
               sessionStorage.removeItem('csrfToken');
-              
-              // Refresh the page - CHANGE THIS to redirect to home
-              // window.location.reload(); 
-              window.location.href = '/'; // Redirect to home page for clean state
+              window.location.href = '/';
             } else {
               console.error('Logout failed:', await response.text());
               alert('Failed to logout. Please try again.');
@@ -227,14 +215,12 @@
           }
         });
 
-        // Show and initialize Purchase History section
-        initializePurchaseHistory();
-        await loadPurchaseHistory();
+        initializePurchaseHistory(); // Ensure this function is defined or loaded before call
+        await loadPurchaseHistory(); // Ensure this function is defined or loaded before call
 
-        // Fetch and store CSRF token for authenticated users
         try {
             console.log('Fetching CSRF token for main page...');
-            const csrfResponse = await fetch('/api/csrf-token'); // Use relative path
+            const csrfResponse = await fetch(`${BASE_URL}/api/csrf-token`); // Ensure /api/
             if (csrfResponse.ok) {
                 const csrfData = await csrfResponse.json();
                 sessionStorage.setItem('csrfToken', csrfData.csrfToken);
@@ -246,9 +232,10 @@
             console.error('Error fetching CSRF token:', error);
         }
       } else {
-        // User is logged out - ensure register button is shown (it's visible by default)
         logoutLink.style.display = 'none';
-        adminLink.style.display = 'none';
+        adminLink.style.display = 'none'; 
+        loginLink.style.display = 'inline';
+        registerLink.style.display = 'inline';
       }
     });
 
@@ -296,7 +283,6 @@
                 
                 if (response.status === 401) {
                     errorMsg = 'Session expired or invalid. Please log in again to view history.';
-                    // Optionally redirect to login
                     // window.location.href = '/login.html';
                 } else if (contentType && contentType.indexOf("application/json") !== -1) {
                     // Try to parse JSON error message from server if available
@@ -387,15 +373,13 @@
       }
     }, true);
   </script>
-  <!-- Load sanitization utilities first -->
-  <script src="/js/sanitize.js"></script>
-  <!-- Load shop validation -->
-  <script src="/js/shop-validation.js"></script>
-  <!-- Load router -->
-  <script src="/router.js"></script>
-  <!-- Load cart -->
-  <script src="/cart.js"></script>
-  <!-- Finally load main.js which depends on both -->
-  <script src="/main.js"></script>
+  
+  <!-- Consolidated External JS files -->
+  <script src="/js/sanitize.js" defer></script>
+  <script src="/js/shop-validation.js" defer></script> 
+  <script src="public/router.js" defer></script>
+  <script src="public/cart.js" defer></script>
+  <script src="public/main.js" defer></script>
+
 </body>
 </html>
