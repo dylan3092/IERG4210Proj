@@ -4,14 +4,27 @@ const stripe = Stripe('pk_test_51RJCbCGfdrXt5LBwGqH6Hot5HdIrIQOHEs0EpGKoHEcf7EMG
 
 // OOP implementation of Shopping Cart
 class CartItem {
-    constructor(productId, name, price, quantity = 1, image = null) {
+    constructor(productId, name, price, quantity = 1, image = null, discountInfo = null) {
         this.productId = productId;
         this.name = name;
         this.price = Number(price);
         this.quantity = quantity;
         this.image = image;
-        this.originalTotal = null; // To store the non-discounted total if a discount is applied
+        this.originalTotal = null;
         this.discountApplied = false;
+
+        this.discountType = null;
+        this.bogoBuyQty = null;
+        this.bogoGetFreeQty = null;
+
+        if (discountInfo && discountInfo.type === 'BOGO' && 
+            Number.isInteger(discountInfo.bogo_buy_quantity) && discountInfo.bogo_buy_quantity > 0 &&
+            Number.isInteger(discountInfo.bogo_get_free_quantity) && discountInfo.bogo_get_free_quantity > 0) {
+            this.discountType = 'BOGO';
+            this.bogoBuyQty = discountInfo.bogo_buy_quantity;
+            this.bogoGetFreeQty = discountInfo.bogo_get_free_quantity;
+            console.log(`[CartItem ${this.productId}] Initialized with BOGO discount: Buy ${this.bogoBuyQty} Get ${this.bogoGetFreeQty}`);
+        }
     }
 
     getTotal() {
@@ -19,20 +32,16 @@ class CartItem {
         this.originalTotal = rawTotal; // Always store the raw total
         this.discountApplied = false;
 
-        // --- NEW: BOGO Discount Logic for Mineral Water (pid 3) ---
-        // Assuming Mineral Water pid is '3' (as a string, since productIds in cart might be strings)
-        if (this.productId.toString() === '3') {
-            const bogoBuyQuantity = 2;
-            const bogoGetFreeQuantity = 1;
-            const itemsPerDealCycle = bogoBuyQuantity + bogoGetFreeQuantity; // e.g., 3 items for the deal
+        // --- GENERALIZED BOGO Discount Logic ---
+        if (this.discountType === 'BOGO' && this.bogoBuyQty && this.bogoGetFreeQty) {
+            const itemsPerDealCycle = this.bogoBuyQty + this.bogoGetFreeQty;
 
             if (this.quantity >= itemsPerDealCycle) {
                 const numDealCycles = Math.floor(this.quantity / itemsPerDealCycle);
-                const numFreeItems = numDealCycles * bogoGetFreeQuantity;
+                const numFreeItems = numDealCycles * this.bogoGetFreeQty;
                 const numPaidItems = this.quantity - numFreeItems;
                 this.discountApplied = true;
                 const discountedTotal = numPaidItems * this.price;
-                // console.log(`BOGO applied for ${this.name}: ${numPaidItems} paid, ${numFreeItems} free. Original: ${rawTotal.toFixed(2)}, Discounted: ${discountedTotal.toFixed(2)}`);
                 return discountedTotal;
             }
         }
@@ -84,7 +93,8 @@ class ShoppingCart {
                             item.name || '', 
                             item.price || 0, 
                             item.quantity || 1, 
-                            item.image || null
+                            item.image || null,
+                            item.discount || null
                         );
                     }
                 });
@@ -115,12 +125,11 @@ class ShoppingCart {
 
     // Add item to cart
     async addItem(productId, quantity = 1) {
-        console.log(`[Cart.addItem] Start. ProductId: ${productId}, Quantity: ${quantity}, isLoading: ${this.isLoading}`); // Log start
+        console.log(`[Cart.addItem] Start. ProductId: ${productId}, Quantity: ${quantity}, isLoading: ${this.isLoading}`);
         if (this.isLoading) return;
         this.isLoading = true;
         
         try {
-            // Strict validation - reject invalid inputs
             const sanitizedProductId = sanitize.html(productId);
             
             if (!/^\d+$/.test(quantity.toString())) {
@@ -136,38 +145,38 @@ class ShoppingCart {
                 return;
             }
 
-            // Fetch product details first to verify it exists
-            const productDetails = await this.fetchProductDetails(sanitizedProductId);
+            let productDetails = this.items[sanitizedProductId] ? 
+                { name: this.items[sanitizedProductId].name, price: this.items[sanitizedProductId].price, image: this.items[sanitizedProductId].image, discount: null } : // Basic info if already in cart
+                await this.fetchProductDetails(sanitizedProductId); // Fetch full details if new
+            
             if (!productDetails) {
-                throw new Error('Product not found');
+                throw new Error('Product not found or details could not be fetched.');
             }
 
-            // Preload image
-            await this.preloadProductImage(sanitizedProductId);
+            // Preload image (already done by fetchProductDetails if it was called, but good to ensure)
+            // await this.preloadProductImage(sanitizedProductId, productDetails.image); // preloadProductImage may need productDetails.image
 
-            // Update cart
             if (this.items[sanitizedProductId]) {
                 this.items[sanitizedProductId].updateQuantity(this.items[sanitizedProductId].quantity + quantity);
             } else {
+                // Pass productDetails.discount to CartItem constructor
                 this.items[sanitizedProductId] = new CartItem(
                     sanitizedProductId,
                     productDetails.name,
                     productDetails.price,
                     quantity,
-                    productDetails.image
+                    productDetails.image,
+                    productDetails.discount // Pass the whole discount object
                 );
             }
 
-            // Save and notify
             this.save();
-            console.log(`[Cart.addItem] Saved cart. Emitting itemAdded.`); // Log before emit
             this.emit('itemAdded', { productId: sanitizedProductId, quantity });
             
         } catch (error) {
-            console.error('[Cart.addItem] Error adding to cart:', error); // Log error
+            console.error('[Cart.addItem] Error adding to cart:', error);
         } finally {
             this.isLoading = false;
-            console.log(`[Cart.addItem] Finished. isLoading: ${this.isLoading}`); // Log finish
         }
     }
 
@@ -237,11 +246,11 @@ class ShoppingCart {
             const sanitizedProductId = encodeURIComponent(sanitize.html(productId));
             const response = await fetch(`${BASE_URL}/api/products/${sanitizedProductId}`);
             if (!response.ok) {
-                throw new Error('Product not found');
+                throw new Error(`Product not found (status: ${response.status})`);
             }
             
             const data = await response.json();
-            // Sanitize response data
+            // Sanitize response data but preserve the discount object structure
             return {
                 pid: sanitize.html(data.pid),
                 name: sanitize.html(data.name),
@@ -249,7 +258,8 @@ class ShoppingCart {
                 image: data.image ? sanitize.html(data.image) : null,
                 description: sanitize.html(data.description),
                 catid: sanitize.html(data.catid),
-                category_name: sanitize.html(data.category_name)
+                category_name: sanitize.html(data.category_name),
+                discount: data.discount // Keep the discount object as is from API
             };
             
         } catch (error) {

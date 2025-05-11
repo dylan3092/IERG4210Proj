@@ -1037,22 +1037,25 @@ app.get('/api/products/:id', async (req, res) => {
 
         const product = rows[0];
 
-        // --- NEW: Fetch active discount for this product ---
+        // --- MODIFIED: Fetch active BOGO discount parameters for this product ---
         const [discountRules] = await pool.query(
-            'SELECT description, discount_type FROM discounts WHERE product_id = ? AND is_active = TRUE LIMIT 1',
+            'SELECT description, discount_type, bogo_buy_quantity, bogo_get_free_quantity FROM discounts WHERE product_id = ? AND discount_type = \'BOGO\' AND is_active = TRUE LIMIT 1',
             [product.pid]
         );
 
         if (discountRules.length > 0) {
+            const rule = discountRules[0];
             product.discount = {
-                description: discountRules[0].description,
-                type: discountRules[0].discount_type
+                description: rule.description,
+                type: rule.discount_type, // Should be 'BOGO'
+                bogo_buy_quantity: parseInt(rule.bogo_buy_quantity, 10),
+                bogo_get_free_quantity: parseInt(rule.bogo_get_free_quantity, 10)
             };
-            console.log(`[API /api/products/:id] Found active discount for PID ${product.pid}: ${product.discount.description}`);
+            console.log(`[API /api/products/:id] Found active BOGO discount for PID ${product.pid}:`, product.discount);
         }
         // --- END: Fetch active discount ---
         
-        res.json(product); // Send the product, now possibly with discount info
+        res.json(product); // Send the product, now possibly with detailed BOGO discount info
     } catch (error) {
         console.error('Error fetching product:', error);
         res.status(500).json({ error: error.message });
