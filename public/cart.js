@@ -10,10 +10,35 @@ class CartItem {
         this.price = Number(price);
         this.quantity = quantity;
         this.image = image;
+        this.originalTotal = null; // To store the non-discounted total if a discount is applied
+        this.discountApplied = false;
     }
 
     getTotal() {
-        return this.price * this.quantity;
+        const rawTotal = this.price * this.quantity;
+        this.originalTotal = rawTotal; // Always store the raw total
+        this.discountApplied = false;
+
+        // --- NEW: BOGO Discount Logic for Mineral Water (pid 3) ---
+        // Assuming Mineral Water pid is '3' (as a string, since productIds in cart might be strings)
+        if (this.productId.toString() === '3') {
+            const bogoBuyQuantity = 2;
+            const bogoGetFreeQuantity = 1;
+            const itemsPerDealCycle = bogoBuyQuantity + bogoGetFreeQuantity; // e.g., 3 items for the deal
+
+            if (this.quantity >= itemsPerDealCycle) {
+                const numDealCycles = Math.floor(this.quantity / itemsPerDealCycle);
+                const numFreeItems = numDealCycles * bogoGetFreeQuantity;
+                const numPaidItems = this.quantity - numFreeItems;
+                this.discountApplied = true;
+                const discountedTotal = numPaidItems * this.price;
+                // console.log(`BOGO applied for ${this.name}: ${numPaidItems} paid, ${numFreeItems} free. Original: ${rawTotal.toFixed(2)}, Discounted: ${discountedTotal.toFixed(2)}`);
+                return discountedTotal;
+            }
+        }
+        // --- END: BOGO Discount Logic ---
+        
+        return rawTotal;
     }
 
     updateQuantity(newQuantity) {
@@ -291,48 +316,65 @@ class CartUIController {
     }
 
     updateDisplay() {
-        console.log("[CartUIController.updateDisplay] Updating cart display."); // Log display update start
         if (!this.cartList || !this.cartTotal || !this.checkoutBtn) {
-            console.warn('Cart UI elements not found. Skipping update.');
+            // console.warn("[CartUI] Cart UI elements not found, skipping display update.");
             return;
         }
-        
-        this.cartList.innerHTML = ''; // Clear existing items
+
+        // Clear existing items visually (except for those being removed, to allow animation)
+        Array.from(this.cartList.children).forEach(child => {
+            if (!child.classList.contains('removing')) {
+                child.remove();
+            }
+        });
+
         const items = Object.values(this.cart.items);
-        
         if (items.length === 0) {
-            this.cartList.innerHTML = '<li>Your cart is empty.</li>';
+            this.cartList.innerHTML = '<li class="empty-cart-message">Your cart is empty.</li>';
             this.checkoutBtn.disabled = true;
         } else {
             items.forEach(item => {
                 const li = document.createElement('li');
-                li.dataset.pid = item.productId;
+                li.className = 'cart-item';
+                li.dataset.productId = item.productId;
+
+                const itemImageHTML = item.image ? 
+                    `<div class="item-image"><img src="${sanitize.url(`${BASE_URL}/uploads/${item.image}`)}" alt="${sanitize.attribute(item.name)}"></div>` : 
+                    '<div class="item-image placeholder"></div>'; // Placeholder for no image
                 
-                // Sanitize all dynamic content before adding to DOM
-                const safeName = sanitize.html(item.name);
-                const safePrice = sanitize.number(item.price, 2).toFixed(2);
-                const safeTotal = sanitize.number(item.getTotal(), 2).toFixed(2);
-                const safeQuantity = sanitize.number(item.quantity);
-                
-                // Use textContent for safe text insertion
+                // --- MODIFIED: Price display logic ---
+                let priceDisplayHTML;
+                const currentItemTotal = item.getTotal(); // This will be discounted if applicable
+
+                if (item.discountApplied && item.originalTotal && item.originalTotal > currentItemTotal) {
+                    priceDisplayHTML = `
+                        <span class="original-price"><s>$${sanitize.html(item.originalTotal.toFixed(2))}</s></span> 
+                        <span class="discounted-price">$${sanitize.html(currentItemTotal.toFixed(2))}</span>
+                    `;
+                } else {
+                    priceDisplayHTML = `$${sanitize.html(currentItemTotal.toFixed(2))}`;
+                }
+                // --- END: Price display logic ---
+
                 li.innerHTML = `
-                    ${safeName} - 
-                    $${safePrice} x 
-                    <input type="number" class="quantity-input" value="${safeQuantity}" min="1" max="100" data-pid="${item.productId}"> = 
-                    $${safeTotal}
-                    <button class="remove-item" data-pid="${item.productId}">Remove</button>
+                    ${itemImageHTML}
+                    <span class="item-name">${sanitize.html(item.name)} (x${sanitize.html(item.quantity)})</span>
+                    <div class="item-controls">
+                        <button class="quantity-btn decrease-qty" data-product-id="${item.productId}" ${item.quantity <= 1 ? 'disabled' : ''}>-</button>
+                        <span class="item-quantity">${sanitize.html(item.quantity)}</span>
+                        <button class="quantity-btn increase-qty" data-product-id="${item.productId}">+</button>
+                    </div>
+                    <span class="item-price">${priceDisplayHTML}</span> 
+                    <button class="remove-item" data-product-id="${item.productId}">&times;</button>
                 `;
                 this.cartList.appendChild(li);
             });
             this.checkoutBtn.disabled = false;
         }
-        
-        // Update total (animate)
-        const currentTotal = parseFloat(this.cartTotal.textContent.replace(/[^\d.]/g, '')) || 0;
+
+        // Update cart total and item count with animation
         const newTotal = this.cart.getTotal();
-        this.animateValue(this.cartTotal, currentTotal, newTotal, 300);
-        
-        console.log("[CartUIController.updateDisplay] Finished updating display."); // Log display update end
+        this.animateValue(this.cartTotal, parseFloat(this.cartTotal.textContent.replace(/[^\d.]/g, '')) || 0, newTotal, 300);
         
         // Add event listeners to new quantity inputs and remove buttons
         this.cartList.querySelectorAll('.quantity-input').forEach(input => {

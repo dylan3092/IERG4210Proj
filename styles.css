@@ -652,3 +652,14 @@ button[type="submit"]:disabled {
     border-radius: 4px;
     text-align: center; /* Center the text if desired */
 }
+
+/* --- Cart Item Discount Styling --- */
+.cart-item .item-price .original-price s {
+    color: #999; /* Lighter color for strikethrough */
+    margin-right: 5px;
+}
+
+.cart-item .item-price .discounted-price {
+    color: #d9534f; /* Same red as product offer */
+    font-weight: bold;
+}
