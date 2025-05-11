@@ -1905,44 +1905,40 @@ app.post('/api/create-checkout-session', authUtils.authenticate, async (req, res
                 "SELECT * FROM discounts WHERE product_id = ? AND discount_type = 'BOGO' AND is_active = TRUE LIMIT 1",
                 [product.pid]
             );
-            const activeBogoRule = discountRules.length > 0 ? discountRules[0] : null;
 
-            let itemTotal;
             let effectivePricePerUnitForDb = priceFromDb; // Default to original price
 
-            if (activeBogoRule) {
-                const cart_quantity = inputItem.quantity;
-                const buy_qty = activeBogoRule.bogo_buy_quantity;
-                const free_qty = activeBogoRule.bogo_get_free_quantity;
+            if (discountRules.length > 0) {
+                const discountRule = discountRules[0];
+                const buy_qty = parseInt(discountRule.bogo_buy_quantity, 10);
+                const free_qty = parseInt(discountRule.bogo_get_free_quantity, 10);
 
-                // Ensure BOGO rule parameters are valid (positive integers)
                 if (buy_qty > 0 && free_qty > 0) {
                     const items_per_deal_cycle = buy_qty + free_qty;
-                    
-                    // Apply discount only if cart quantity is enough for at least one full deal cycle
-                    if (cart_quantity >= items_per_deal_cycle) {
-                        const num_deal_cycles = Math.floor(cart_quantity / items_per_deal_cycle);
+                    if (inputItem.quantity >= items_per_deal_cycle) {
+                        const num_deal_cycles = Math.floor(inputItem.quantity / items_per_deal_cycle);
                         const num_free_items_for_this_product = num_deal_cycles * free_qty;
-                        const num_paid_items_for_this_product = cart_quantity - num_free_items_for_this_product;
+                        const num_paid_items_for_this_product = inputItem.quantity - num_free_items_for_this_product;
                         
                         itemTotal = num_paid_items_for_this_product * priceFromDb;
-                        if (cart_quantity > 0) { // Avoid division by zero
-                            effectivePricePerUnitForDb = itemTotal / cart_quantity;
+                        if (inputItem.quantity > 0) { // Avoid division by zero
+                            effectivePricePerUnitForDb = itemTotal / inputItem.quantity;
                         }
-                        console.log(`[create-checkout] BOGO applied for PID ${product.pid}: ${num_paid_items_for_this_product} paid, ${num_free_items_for_this_product} free. Original item total: ${cart_quantity * priceFromDb}, New itemTotal: ${itemTotal.toFixed(2)}, Effective unit price: ${effectivePricePerUnitForDb.toFixed(2)}`);
+                        console.log(`[create-checkout] BOGO applied for PID ${product.pid}: ${num_paid_items_for_this_product} paid, ${num_free_items_for_this_product} free. Original item total: ${inputItem.quantity * priceFromDb}, New itemTotal: ${itemTotal.toFixed(2)}, Effective unit price: ${effectivePricePerUnitForDb.toFixed(2)}`);
                     } else {
                         // Not enough quantity for a full BOGO deal cycle
-                        itemTotal = cart_quantity * priceFromDb;
-                        console.log(`[create-checkout] BOGO not applied for PID ${product.pid}: quantity ${cart_quantity} less than deal cycle ${items_per_deal_cycle}`);
+                        itemTotal = inputItem.quantity * priceFromDb;
+                        console.log(`[create-checkout] BOGO not applied for PID ${product.pid} (Reason: quantity ${inputItem.quantity} < items_per_deal_cycle ${items_per_deal_cycle})`);
                     }
                 } else {
                     // Invalid BOGO rule parameters (e.g., buy_qty or free_qty is zero or less)
-                    itemTotal = cart_quantity * priceFromDb;
-                     console.warn(`[create-checkout] Invalid BOGO rule parameters for PID ${product.pid}. buy_qty: ${buy_qty}, free_qty: ${free_qty}`);
+                    itemTotal = inputItem.quantity * priceFromDb;
+                    console.warn(`[create-checkout] Invalid BOGO rule for PID ${product.pid}. buy_qty: ${buy_qty}, free_qty: ${free_qty}. Using original price.`);
                 }
             } else {
                 // No active BOGO rule for this product
-                itemTotal = cart_quantity * priceFromDb;
+                itemTotal = inputItem.quantity * priceFromDb;
+                // console.log(`[create-checkout] No active BOGO rule for PID ${product.pid}. Using original price.`);
             }
             // --- END: BOGO Discount Logic ---
             
