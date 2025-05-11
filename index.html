@@ -108,11 +108,11 @@
       <div class="user-info">
         Welcome, <span id="user-display">Guest</span>
         <div class="user-actions">
-          <button onclick="window.location.href='register.html'" id="register-link" class="link-button">Register</button>
-          <button onclick="window.location.href='login.html'" id="login-link" class="link-button">Login</button>
-          <a href="#" id="logout-link" style="display: none;">Logout</a>
-          <a href="/admin.html" id="admin-link" style="display: none;">Admin Panel</a>
-          <a href="/member.html" id="member-link" style="display: none;" target="_self">Member Panel</a>
+          <button onclick="window.location.href='register.html'" id="register-link-btn" class="link-button">Register</button>
+          <button onclick="window.location.href='login.html'" id="login-link-btn" class="link-button">Login</button>
+          <button id="logout-btn" class="link-button" style="display: none;">Logout</button>
+          <button id="admin-link-btn" class="link-button" style="display: none;">Admin Panel</button>
+          <button id="member-link-btn" class="link-button" style="display: none;">Member Panel</button>
         </div>
       </div>
     </div>
@@ -178,51 +178,67 @@
       const userEmail = sessionStorage.getItem('userEmail');
       const isAdmin = sessionStorage.getItem('isAdmin');
       const userDisplay = document.getElementById('user-display');
-      const loginLink = document.getElementById('login-link');
-      const registerLink = document.getElementById('register-link');
-      const logoutLink = document.getElementById('logout-link');
-      const adminLink = document.getElementById('admin-link');
-      const memberLink = document.getElementById('member-link');
+      
+      // Updated to button IDs
+      const loginLinkBtn = document.getElementById('login-link-btn');
+      const registerLinkBtn = document.getElementById('register-link-btn');
+      const logoutBtn = document.getElementById('logout-btn');
+      const adminLinkBtn = document.getElementById('admin-link-btn');
+      const memberLinkBtn = document.getElementById('member-link-btn');
       
       if (userEmail) {
         userDisplay.textContent = userEmail;
-        loginLink.style.display = 'none';
-        registerLink.style.display = 'none';
-        logoutLink.style.display = 'inline';
-        adminLink.style.display = 'none';
-        memberLink.style.display = 'none';
+        if (loginLinkBtn) loginLinkBtn.style.display = 'none';
+        if (registerLinkBtn) registerLinkBtn.style.display = 'none';
+        if (logoutBtn) logoutBtn.style.display = 'inline';
+        
+        if (adminLinkBtn) adminLinkBtn.style.display = 'none'; 
+        if (memberLinkBtn) memberLinkBtn.style.display = 'none';
         
         if (isAdmin === 'true') {
-          adminLink.style.display = 'inline';
+          if (adminLinkBtn) adminLinkBtn.style.display = 'inline';
         } else {
-          memberLink.style.display = 'inline';
+          if (memberLinkBtn) memberLinkBtn.style.display = 'inline';
         }
         
-        logoutLink.addEventListener('click', async (e) => {
-          e.preventDefault();
-          try {
-            const response = await fetch(`${BASE_URL}/api/logout`, { // Ensure /api/
-              method: 'POST',
-              credentials: 'include',
-              headers: { 'Content-Type': 'application/json' }
+        // Logout Button Event Listener
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', async (e) => {
+              e.preventDefault();
+              try {
+                const response = await fetch(`${BASE_URL}/api/logout`, { 
+                  method: 'POST',
+                  credentials: 'include',
+                  headers: { 'Content-Type': 'application/json' }
+                });
+                if (response.ok) {
+                  sessionStorage.removeItem('userEmail');
+                  sessionStorage.removeItem('isAdmin');
+                  sessionStorage.removeItem('csrfToken');
+                  window.location.href = '/';
+                } else {
+                  console.error('Logout failed:', await response.text());
+                  alert('Failed to logout. Please try again.');
+                }
+              } catch (error) {
+                console.error('Logout error:', error);
+                alert('Network error during logout. Please try again.');
+              }
             });
-            if (response.ok) {
-              sessionStorage.removeItem('userEmail');
-              sessionStorage.removeItem('isAdmin');
-              sessionStorage.removeItem('csrfToken');
-              window.location.href = '/';
-            } else {
-              console.error('Logout failed:', await response.text());
-              alert('Failed to logout. Please try again.');
-            }
-          } catch (error) {
-            console.error('Logout error:', error);
-            alert('Network error during logout. Please try again.');
-          }
-        });
+        }
 
-        initializePurchaseHistory(); // Ensure this function is defined or loaded before call
-        await loadPurchaseHistory(); // Ensure this function is defined or loaded before call
+        // Admin Panel Button Event Listener
+        if (adminLinkBtn) {
+            adminLinkBtn.addEventListener('click', () => window.location.href = '/admin.html');
+        }
+
+        // Member Panel Button Event Listener
+        if (memberLinkBtn) {
+            memberLinkBtn.addEventListener('click', () => window.location.href = '/member.html');
+        }
+
+        initializePurchaseHistory();
+        await loadPurchaseHistory();
 
         try {
             console.log('Fetching CSRF token for main page...');
@@ -238,11 +254,11 @@
             console.error('Error fetching CSRF token:', error);
         }
       } else {
-        logoutLink.style.display = 'none';
-        adminLink.style.display = 'none'; 
-        memberLink.style.display = 'none';
-        loginLink.style.display = 'inline';
-        registerLink.style.display = 'inline';
+        if (logoutBtn) logoutBtn.style.display = 'none';
+        if (adminLinkBtn) adminLinkBtn.style.display = 'none'; 
+        if (memberLinkBtn) memberLinkBtn.style.display = 'none'; 
+        if (loginLinkBtn) loginLinkBtn.style.display = 'inline';
+        if (registerLinkBtn) registerLinkBtn.style.display = 'inline';
       }
     });
 
