@@ -227,7 +227,7 @@ class ShoppingCart {
                 const product = await this.fetchProductDetails(sanitizedProductId);
                 if (product && product.image) {
                     const img = new Image();
-                    img.src = sanitize.url(`${BASE_URL}/uploads/${product.image}`);
+                    img.src = sanitize.url(`/uploads/${product.image}`);
                     this.imageCache.set(sanitizedProductId, img);
                 }
             } catch (error) {
@@ -342,10 +342,10 @@ class CartUIController {
                 li.dataset.productId = item.productId;
 
                 // DEBUG: Log item image details
-                console.log(`[CartUI] Item: ${item.name}, Image Filename: ${item.image}, Full Image URL Attempt: ${item.image ? sanitize.url(`${BASE_URL}/uploads/${item.image}`) : 'No image'}`);
+                console.log(`[CartUI] Item: ${item.name}, Image Filename: ${item.image}, Full Image URL Attempt: ${item.image ? sanitize.url(`/uploads/${item.image}`) : 'No image'}`);
 
                 const itemImageHTML = item.image ? 
-                    `<div class="item-image"><img src="${sanitize.url(`${BASE_URL}/uploads/${item.image}`)}" alt="${sanitize.attribute(item.name)}"></div>` : 
+                    `<div class="item-image"><img src="${sanitize.url(`/uploads/${item.image}`)}" alt="${sanitize.attribute(item.name)}"></div>` : 
                     '<div class="item-image placeholder"></div>';
                 
                 let priceDisplayHTML;
