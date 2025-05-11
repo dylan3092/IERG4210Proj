@@ -502,3 +502,40 @@ document.addEventListener('DOMContentLoaded', async () => {
         showMessage("Failed to load some admin data. Please check console.", true);
     }
 }); 
+
+// Change Password
+const handleChangePasswordSubmit = async (event) => {
+    event.preventDefault();
+    const form = event.target;
+    const currentPassword = form.elements['current-password'].value;
+    const newPassword = form.elements['new-password'].value;
+    const confirmPassword = form.elements['confirm-password'].value;
+
+    if (newPassword !== confirmPassword) {
+        showMessage('New passwords do not match.', true);
+        return;
+    }
+
+    try {
+        const response = await safeFetch(`${BASE_URL}/api/change-password`, { 
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ currentPassword, newPassword })
+        });
+
+        const result = await response.json(); 
+
+        if (!response.ok) {
+            throw new Error(result.error || `Failed to change password: ${response.statusText}`);
+        }
+        
+        showMessage(result.message || 'Password changed successfully! Please log in again.');
+        form.reset();
+        window.location.href = '/login.html?status=password_changed';
+
+    } catch (error) {
+        showMessage(error.message || 'An unexpected error occurred.', true);
+    }
+}; 
