@@ -521,7 +521,7 @@ const handleChangePasswordSubmit = async (event) => {
 
     try {
         console.log('[AdminJS handleChangePasswordSubmit] About to call safeFetch. Token is:', csrfToken);
-        const responseFromSafeFetch = await safeFetch(`${BASE_URL}/api/change-password`, { 
+        const responseFromSafeFetch = await safeFetch(`${BASE_URL}/change-password`, { 
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
