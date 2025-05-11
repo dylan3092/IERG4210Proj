@@ -111,7 +111,8 @@
           <button onclick="window.location.href='register.html'" id="register-link" class="link-button">Register</button>
           <button onclick="window.location.href='login.html'" id="login-link" class="link-button">Login</button>
           <a href="#" id="logout-link" style="display: none;">Logout</a>
-          <a href="/admin" id="admin-link" style="display: none;">Admin Panel</a>
+          <a href="/admin.html" id="admin-link" style="display: none;">Admin Panel</a>
+          <a href="/member.html" id="member-link" style="display: none;">Member Panel</a>
         </div>
       </div>
     </div>
@@ -181,15 +182,20 @@
       const registerLink = document.getElementById('register-link');
       const logoutLink = document.getElementById('logout-link');
       const adminLink = document.getElementById('admin-link');
+      const memberLink = document.getElementById('member-link');
       
       if (userEmail) {
         userDisplay.textContent = userEmail;
         loginLink.style.display = 'none';
         registerLink.style.display = 'none';
         logoutLink.style.display = 'inline';
+        adminLink.style.display = 'none';
+        memberLink.style.display = 'none';
         
         if (isAdmin === 'true') {
           adminLink.style.display = 'inline';
+        } else {
+          memberLink.style.display = 'inline';
         }
         
         logoutLink.addEventListener('click', async (e) => {
@@ -234,6 +240,7 @@
       } else {
         logoutLink.style.display = 'none';
         adminLink.style.display = 'none'; 
+        memberLink.style.display = 'none';
         loginLink.style.display = 'inline';
         registerLink.style.display = 'inline';
       }

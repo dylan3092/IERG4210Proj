@@ -1766,24 +1766,17 @@ app.get('/api/user/orders', authUtils.authenticate, async (req, res) => {
         connection = await pool.getConnection();
         console.log('[API /api/user/orders] DB connection obtained');
 
-        // Query to get the last 5 orders for the specific user, along with items
+        // Query to get all orders for the specific user, along with items
         const sql = `
             SELECT 
                 o.order_id, o.user_email, o.total_amount, o.currency, o.status, 
                 o.stripe_session_id, o.created_at AS order_date,
                 oi.product_id, oi.quantity, oi.price_at_purchase,
                 p.name AS product_name
-            FROM (
-                -- Select the 5 most recent order IDs for the user
-                SELECT order_id
-                FROM orders
-                WHERE user_id = ?
-                ORDER BY created_at DESC
-                LIMIT 5
-            ) AS recent_orders
-            JOIN orders o ON recent_orders.order_id = o.order_id
+            FROM orders o
             LEFT JOIN order_items oi ON o.order_id = oi.order_id
             LEFT JOIN products p ON oi.product_id = p.pid
+            WHERE o.user_id = ? 
             ORDER BY o.created_at DESC, o.order_id DESC, oi.product_id ASC;
         `;
         console.log('[API /api/user/orders] Executing SQL query');
