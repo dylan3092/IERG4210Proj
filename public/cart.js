@@ -1,8 +1,3 @@
-// Define BASE_URL (ensure consistency with other files like main.js)
-const BASE_URL = window.location.protocol === 'https:' ? 
-    'https://s15.ierg4210.ie.cuhk.edu.hk' : 
-    'http://s15.ierg4210.ie.cuhk.edu.hk:3000';
-
 // Initialize Stripe (Replace with your actual publishable key)
 // IMPORTANT: Make sure Stripe.js script is included in your HTML before this script.
 const stripe = Stripe('pk_test_51RJCbCGfdrXt5LBwGqH6Hot5HdIrIQOHEs0EpGKoHEcf7EMG9QVJXzPoarHjzjNJhkV6eGDUbnQhhRG6ar0AU8Oc00ToxczFqW'); 

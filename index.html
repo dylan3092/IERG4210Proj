@@ -350,36 +350,13 @@
         }
     }
   </script>
-  <!-- Script path detector -->
-  <script>
-    // Try to detect script loading errors and fix paths
-    window.addEventListener('error', function(e) {
-      const target = e.target;
-      // Check if the error is from a script
-      if (target.tagName === 'SCRIPT') {
-        const src = target.src;
-        console.error('Script failed to load:', src);
-        
-        // If the script path starts with 'public/', try without it
-        if (src.includes('/public/')) {
-          const newSrc = src.replace('/public/', '/');
-          console.log('Trying alternative path:', newSrc);
-          
-          // Create a new script element with the fixed path
-          const newScript = document.createElement('script');
-          newScript.src = newSrc;
-          document.body.appendChild(newScript);
-        }
-      }
-    }, true);
-  </script>
   
   <!-- Consolidated External JS files -->
   <script src="/js/sanitize.js" defer></script>
   <script src="/js/shop-validation.js" defer></script> 
-  <script src="public/router.js" defer></script>
-  <script src="public/cart.js" defer></script>
-  <script src="public/main.js" defer></script>
+  <script src="/router.js" defer></script>
+  <script src="/cart.js" defer></script>
+  <script src="/main.js" defer></script>
 
 </body>
 </html>
