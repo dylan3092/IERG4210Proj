@@ -1034,8 +1034,25 @@ app.get('/api/products/:id', async (req, res) => {
         if (rows.length === 0) {
             return res.status(404).json({ error: 'Product not found' });
         }
+
+        const product = rows[0];
+
+        // --- NEW: Fetch active discount for this product ---
+        const [discountRules] = await pool.query(
+            'SELECT description, discount_type FROM discounts WHERE product_id = ? AND is_active = TRUE LIMIT 1',
+            [product.pid]
+        );
+
+        if (discountRules.length > 0) {
+            product.discount = {
+                description: discountRules[0].description,
+                type: discountRules[0].discount_type
+            };
+            console.log(`[API /api/products/:id] Found active discount for PID ${product.pid}: ${product.discount.description}`);
+        }
+        // --- END: Fetch active discount ---
         
-        res.json(rows[0]);
+        res.json(product); // Send the product, now possibly with discount info
     } catch (error) {
         console.error('Error fetching product:', error);
         res.status(500).json({ error: error.message });

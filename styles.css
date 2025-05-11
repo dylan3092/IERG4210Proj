@@ -640,3 +640,15 @@ button[type="submit"]:disabled {
 .api-error a:hover {
   background-color: #0b7dda;
 }
+
+/* --- Product Discount Offer Styling --- */
+.product-discount-offer {
+    color: #d9534f; /* A reddish color */
+    font-weight: bold;
+    margin-top: 10px;
+    padding: 8px;
+    background-color: #fcf8e3;
+    border: 1px solid #faebcc;
+    border-radius: 4px;
+    text-align: center; /* Center the text if desired */
+}

@@ -51,7 +51,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             <div class="product-info">
                 <h1>${sanitize.html(product.name)}</h1>
                 <p class="category">Category: ${sanitize.html(product.category_name)}</p>
-                <p class="price">$${sanitize.html(Number(product.price).toFixed(2))}</p>
+                <p class="price" id="product-price">$${sanitize.html(Number(product.price).toFixed(2))}</p>
                 <p class="description">${sanitize.html(product.description)}</p>
                 <div class="purchase-controls">
                     <div class="quantity-control">
@@ -70,6 +70,21 @@ document.addEventListener('DOMContentLoaded', async () => {
                 </div>
             </div>
         `;
+
+        // --- NEW: Display Discount Description ---
+        const productInfoDiv = productDetails.querySelector('.product-info'); // Get the .product-info div
+        const priceElement = productDetails.querySelector('#product-price'); // Get the price element by its new ID
+
+        if (product.discount && product.discount.description && productInfoDiv && priceElement) {
+            const discountElement = document.createElement('p');
+            discountElement.className = 'product-discount-offer';
+            discountElement.textContent = sanitize.html(product.discount.description); // Sanitize the discount description
+            
+            // Insert the discount element after the price element
+            priceElement.insertAdjacentElement('afterend', discountElement);
+            console.log('Discount displayed:', product.discount.description);
+        }
+        // --- END: Display Discount Description ---
 
         // Add event listener for quantity input
         const quantityInput = document.getElementById('quantity');
