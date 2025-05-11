@@ -1572,7 +1572,24 @@ app.get('/admin', authUtils.authorizeAdmin, (req, res) => {
 });
 
 app.get('/admin.html', authUtils.authorizeAdmin, (req, res) => {
-    res.sendFile(path.join(__dirname, 'admin.html'));
+    res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+});
+
+// Add specific route for member page - protected with authentication
+app.get('/member.html', authUtils.authenticate, (req, res) => {
+    // authUtils.authenticate ensures the user is logged in.
+    // The client-side JavaScript (member.js) will handle:
+    // 1. Redirecting to login if somehow accessed without session (though authenticate should catch this).
+    // 2. Redirecting to admin panel if the user is an admin.
+    res.sendFile(path.join(__dirname, 'public', 'member.html'), (err) => {
+        if (err) {
+            console.error(`[SERVER ERROR] Failed to send member.html for user ${req.session?.userEmail || 'Unknown'}:`, err);
+            // Avoid sending another response if headers already sent or error is minor
+            if (!res.headersSent) {
+                 res.status(500).send('Error loading member page.');
+            }
+        }
+    });
 });
 
 // Add middleware to attach user info from session to res.locals
