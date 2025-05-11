@@ -317,11 +317,9 @@ class CartUIController {
 
     updateDisplay() {
         if (!this.cartList || !this.cartTotal || !this.checkoutBtn) {
-            // console.warn("[CartUI] Cart UI elements not found, skipping display update.");
             return;
         }
 
-        // Clear existing items visually (except for those being removed, to allow animation)
         Array.from(this.cartList.children).forEach(child => {
             if (!child.classList.contains('removing')) {
                 child.remove();
@@ -340,57 +338,65 @@ class CartUIController {
 
                 const itemImageHTML = item.image ? 
                     `<div class="item-image"><img src="${sanitize.url(`${BASE_URL}/uploads/${item.image}`)}" alt="${sanitize.attribute(item.name)}"></div>` : 
-                    '<div class="item-image placeholder"></div>'; // Placeholder for no image
+                    '<div class="item-image placeholder"></div>';
                 
-                // --- MODIFIED: Price display logic ---
                 let priceDisplayHTML;
-                const currentItemTotal = item.getTotal(); // This will be discounted if applicable
+                const currentItemTotal = item.getTotal(); 
 
-                if (item.discountApplied && item.originalTotal && item.originalTotal > currentItemTotal) {
+                if (item.discountApplied && item.originalTotal != null && item.originalTotal > currentItemTotal) {
                     priceDisplayHTML = `
                         <span class="original-price"><s>$${sanitize.html(item.originalTotal.toFixed(2))}</s></span> 
                         <span class="discounted-price">$${sanitize.html(currentItemTotal.toFixed(2))}</span>
                     `;
                 } else {
-                    priceDisplayHTML = `$${sanitize.html(currentItemTotal.toFixed(2))}`;
+                    // Display the raw total if no discount or if discounted total isn't less (e.g. bad rule)
+                    priceDisplayHTML = `$${sanitize.html(item.originalTotal != null ? item.originalTotal.toFixed(2) : currentItemTotal.toFixed(2))}`;
                 }
-                // --- END: Price display logic ---
 
+                // Corrected item name display and quantity input
                 li.innerHTML = `
                     ${itemImageHTML}
-                    <span class="item-name">${sanitize.html(item.name)} (x${sanitize.html(item.quantity)})</span>
-                    <div class="item-controls">
-                        <button class="quantity-btn decrease-qty" data-product-id="${item.productId}" ${item.quantity <= 1 ? 'disabled' : ''}>-</button>
-                        <span class="item-quantity">${sanitize.html(item.quantity)}</span>
-                        <button class="quantity-btn increase-qty" data-product-id="${item.productId}">+</button>
+                    <div class="item-info">
+                        <span class="item-name">${sanitize.html(item.name)}</span>
+                        <div class="item-controls">
+                            <button class="quantity-btn decrease-qty" data-product-id="${item.productId}" ${item.quantity <= 1 ? 'disabled' : ''}>-</button>
+                            <input type="number" class="item-quantity-input" value="${sanitize.html(item.quantity)}" min="1" max="100" data-product-id="${item.productId}">
+                            <button class="quantity-btn increase-qty" data-product-id="${item.productId}">+</button>
+                        </div>
                     </div>
                     <span class="item-price">${priceDisplayHTML}</span> 
                     <button class="remove-item" data-product-id="${item.productId}">&times;</button>
                 `;
                 this.cartList.appendChild(li);
+
+                // --- NEW: Add event listeners to the new elements directly --- 
+                li.querySelector('.decrease-qty').addEventListener('click', (e) => {
+                    const pid = e.target.dataset.productId;
+                    this.updateQuantity(pid, this.cart.items[pid].quantity - 1);
+                });
+                li.querySelector('.increase-qty').addEventListener('click', (e) => {
+                    const pid = e.target.dataset.productId;
+                    this.updateQuantity(pid, this.cart.items[pid].quantity + 1);
+                });
+                li.querySelector('.item-quantity-input').addEventListener('change', (e) => {
+                    const pid = e.target.dataset.productId;
+                    let newQuantity = parseInt(e.target.value, 10);
+                    if (isNaN(newQuantity) || newQuantity < 1) newQuantity = 1;
+                    if (newQuantity > 100) newQuantity = 100;
+                    e.target.value = newQuantity; // Reflect sanitized value
+                    this.updateQuantity(pid, newQuantity);
+                });
+                li.querySelector('.remove-item').addEventListener('click', (e) => {
+                    const pid = e.target.dataset.productId;
+                    this.removeItem(pid);
+                });
+                // --- END: New event listeners ---
             });
             this.checkoutBtn.disabled = false;
         }
 
-        // Update cart total and item count with animation
         const newTotal = this.cart.getTotal();
         this.animateValue(this.cartTotal, parseFloat(this.cartTotal.textContent.replace(/[^\d.]/g, '')) || 0, newTotal, 300);
-        
-        // Add event listeners to new quantity inputs and remove buttons
-        this.cartList.querySelectorAll('.quantity-input').forEach(input => {
-            input.addEventListener('change', () => {
-                const productId = input.getAttribute('data-pid');
-                const newQuantity = parseInt(input.value);
-                this.updateQuantity(productId, newQuantity);
-            });
-        });
-        
-        this.cartList.querySelectorAll('.remove-item').forEach(button => {
-            button.addEventListener('click', () => {
-                const productId = button.getAttribute('data-pid');
-                this.removeItem(productId);
-            });
-        });
     }
 
     // Animate number changes
