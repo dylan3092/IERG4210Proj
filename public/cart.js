@@ -539,19 +539,19 @@ const cart = new ShoppingCart();
 const cartController = new CartUIController(cart);
 
 // Public API for use in HTML
-function addToCart(productId, quantity = 1) {
+window.addToCart = function(productId, quantity = 1) {
     console.log(`[addToCart] Called with productId: ${productId}, quantity: ${quantity}`); // Log entry
     const sanitizedProductId = sanitize.html(productId);
     console.log(`[addToCart] Sanitized productId: ${sanitizedProductId}`); // Log sanitized ID
     cart.addItem(sanitizedProductId, sanitize.number(quantity, 1));
 }
 
-function updateQuantity(productId, newQuantity) {
+window.updateQuantity = function(productId, newQuantity) {
     const sanitizedProductId = sanitize.html(productId);
     cartController.updateQuantity(sanitizedProductId, sanitize.number(newQuantity, 1));
 }
 
-function removeFromCart(productId) {
+window.removeFromCart = function(productId) {
     const sanitizedProductId = sanitize.html(productId);
     cartController.removeItem(sanitizedProductId);
 }
